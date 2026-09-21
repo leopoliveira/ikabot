@@ -3660,3 +3660,317 @@ body:has(> .main-nav) > .main-content {
 .movement-card.returning {
     border-left-color: var(--color-gold);
 }
+
+/* ==========================================================================
+   PAINEL DE REQUISITOS E PRONTIDÃO DE RECURSOS (EDIFÍCIOS & PESQUISAS)
+   ========================================================================== */
+
+/* Badges de Prontidão de Edifícios */
+.b-readiness-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    letter-spacing: 0.02em;
+}
+
+.b-readiness-badge.ready {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.b-readiness-badge.lack {
+    background: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.28);
+}
+
+/* Painel de Requisitos no Card do Edifício */
+.b-requirements-panel {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.b-requirements-panel.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.b-req-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 0.75rem;
+}
+
+.b-req-title {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.b-req-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.b-req-status.ready {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.b-req-status.lack {
+    color: #fb7185;
+    background: rgba(244, 63, 94, 0.1);
+}
+
+.b-req-materials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.res-cost-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.76rem;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s ease;
+}
+
+.res-cost-chip.sufficient {
+    border-color: rgba(16, 185, 129, 0.25);
+    background: rgba(16, 185, 129, 0.04);
+}
+
+.res-cost-chip.sufficient .res-cost-val {
+    color: #34d399;
+}
+
+.res-cost-chip.insufficient {
+    border-color: rgba(244, 63, 94, 0.4);
+    background: rgba(244, 63, 94, 0.08);
+}
+
+.res-cost-chip.insufficient .res-cost-val {
+    color: #fda4af;
+}
+
+.res-missing-tag {
+    color: #f43f5e;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+.b-req-empty {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 2px 0;
+}
+
+/* ==========================================================================
+   ESTILOS DE CARDS E REQUISITOS DE PESQUISAS (ACADEMIA)
+   ========================================================================== */
+
+.research-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 16px;
+    margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+    .research-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.research-card {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 14px;
+    transition: all var(--transition-normal);
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.research-card:hover {
+    border-color: rgba(56, 189, 248, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.research-card.research-card-active {
+    border-color: rgba(245, 158, 11, 0.6);
+    background: rgba(245, 158, 11, 0.04);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.12);
+}
+
+.research-card.research-card-scheduled {
+    border-color: rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.03);
+}
+
+.research-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.research-branch-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-gold);
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge-research-ready {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.badge-research-lack {
+    background: rgba(244, 63, 94, 0.12);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.28);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.badge-research-active {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-gold);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.research-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 6px 0;
+}
+
+.research-desc {
+    font-size: 0.83rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin: 0 0 12px 0;
+}
+
+/* Barra de Progresso de Pesquisa */
+.research-progress-section {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.research-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.76rem;
+}
+
+.research-progress-header .progress-label {
+    color: var(--text-secondary);
+}
+
+.research-progress-header .progress-pct-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: var(--color-gold);
+}
+
+.research-progress-track {
+    width: 100%;
+    height: 7px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.research-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    border-radius: 999px;
+    transition: width 0.35s ease;
+}
+
+.research-progress-fill.complete {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.research-points-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+.research-estimate-tag {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.research-surplus-tag {
+    color: #34d399;
+    font-weight: 600;
+}

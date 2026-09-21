@@ -740,6 +740,76 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const buildingCostDebounceTimers = {};
+
+    function renderBuildingRequirementsHtml(pos, upgradeCost) {
+        if (!upgradeCost || !upgradeCost.relevant_materials || upgradeCost.relevant_materials.length === 0) {
+            return `
+                <div class="b-requirements-panel" id="req-panel-${pos}">
+                    <div class="b-req-empty">
+                        <span>ℹ️ Requisitos calculados ao selecionar o nível alvo.</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        const itemsHtml = upgradeCost.relevant_materials.map(m => {
+            const isOk = m.sufficient;
+            const diffStr = !isOk && m.missing > 0 ? `<span class="res-missing-tag">(-${formatNumber(m.missing)})</span>` : '';
+            return `
+                <div class="res-cost-chip ${isOk ? 'sufficient' : 'insufficient'}" title="${m.name}: Necessário ${formatNumber(m.cost)} | Em estoque: ${formatNumber(m.available)} ${!isOk ? `(Faltam ${formatNumber(m.missing)})` : ''}">
+                    <span class="res-icon">${m.icon}</span>
+                    <span class="res-cost-val">${formatNumber(m.cost)}</span>
+                    ${diffStr}
+                </div>
+            `;
+        }).join('');
+
+        const statusTag = upgradeCost.has_enough 
+            ? `<span class="b-req-status ready">✓ Recursos em estoque</span>` 
+            : `<span class="b-req-status lack">⚠️ Faltam recursos</span>`;
+
+        return `
+            <div class="b-requirements-panel" id="req-panel-${pos}">
+                <div class="b-req-header">
+                    <span class="b-req-title">Materiais para Nv ${upgradeCost.target_level}:</span>
+                    ${statusTag}
+                </div>
+                <div class="b-req-materials">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    function updateBuildingCostForTarget(cityId, pos, targetLvl) {
+        const panel = document.getElementById(`req-panel-${pos}`);
+        if (!panel) return;
+
+        if (buildingCostDebounceTimers[pos]) {
+            clearTimeout(buildingCostDebounceTimers[pos]);
+        }
+
+        panel.classList.add('loading');
+
+        buildingCostDebounceTimers[pos] = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/city/${cityId}/building/${pos}/cost?target_level=${targetLvl}`);
+                if (!res.ok) return;
+                const costData = await res.json();
+                if (costData.success) {
+                    const newHtml = renderBuildingRequirementsHtml(pos, costData);
+                    const currentPanel = document.getElementById(`req-panel-${pos}`);
+                    if (currentPanel) {
+                        currentPanel.outerHTML = newHtml;
+                    }
+                }
+            } catch (err) {
+                console.error(`Erro ao atualizar custo da pos ${pos}:`, err);
+            }
+        }, 220);
+    }
+
     function renderModernBuildingsGrid(buildings, cityId) {
         if (!buildingsListContainer) return;
 
@@ -812,6 +882,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 minTarget = qTarget + 1;
                 initialTarget = qTarget + 1;
+            } else {
+                if (b.can_upgrade) {
+                    statusBadgeHtml = `<span class="b-readiness-badge ready">🟢 Pronto para Evoluir</span>`;
+                } else {
+                    statusBadgeHtml = `<span class="b-readiness-badge lack">🔴 Faltam Recursos</span>`;
+                }
             }
 
             const cleanName = (b.name_pt || '').replace(/^[^\w\sÀ-ÿ]+\s*/, '');
@@ -835,6 +911,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     ${noticeBannerHtml}
+
+                    ${renderBuildingRequirementsHtml(pos, b.upgrade_cost)}
 
                     <div class="b-card-footer">
                         <div class="b-stepper-row">
@@ -877,6 +955,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     input.value = cur;
                     if (disp) disp.innerText = `Nível ${cur}`;
                     if (schedBtn) schedBtn.innerText = `⬆️ Agendar Fila (Nv ${cur})`;
+                    updateBuildingCostForTarget(cityId, pos, cur);
                 }
             });
         });
@@ -893,6 +972,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.value = cur;
                 if (disp) disp.innerText = `Nível ${cur}`;
                 if (schedBtn) schedBtn.innerText = `⬆️ Agendar Fila (Nv ${cur})`;
+                updateBuildingCostForTarget(cityId, pos, cur);
             });
         });
 
@@ -910,6 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.value = target;
                 if (disp) disp.innerText = `Nível ${target}`;
                 if (schedBtn) schedBtn.innerText = `⬆️ Agendar Fila (Nv ${target})`;
+                updateBuildingCostForTarget(cityId, pos, target);
             });
         });
 
@@ -1521,27 +1602,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             researchListContainer.innerHTML = data.researches.map(r => {
                 const isActive = r.is_active;
-                const costNum = parseInt(String(r.cost || '0').replace(/\D/g, '')) || 0;
+                const costNum = r.cost_num !== undefined ? r.cost_num : (parseInt(String(r.cost || '0').replace(/\D/g, '')) || 0);
                 const isScheduled = scheduledItems.some(si => String(si.study_index) === String(r.index) || si.name === r.name);
-                const hasEnoughPoints = currentPoints >= costNum;
+                const hasEnoughPoints = r.has_enough_points !== undefined ? r.has_enough_points : (currentPoints >= costNum);
+                const diff = r.points_diff !== undefined ? r.points_diff : Math.max(0, costNum - currentPoints);
+                const progPct = r.progress_pct !== undefined ? r.progress_pct : (costNum > 0 ? Math.min(100, Math.round((currentPoints / costNum) * 100)) : 100);
+                const estTime = r.estimated_time_str || '';
 
                 const activeCardClass = isActive ? 'research-card-active' : (isScheduled ? 'research-card-scheduled' : '');
-                const badgeActive = isActive 
-                    ? '<span class="badge-research-active">✨ Em Investigação</span>' 
-                    : (isScheduled ? '<span class="badge-research-active" style="background: rgba(14, 165, 233, 0.2); border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">⏳ Agendada</span>' : '');
+                
+                let badgeActive = '';
+                if (isActive) {
+                    badgeActive = '<span class="badge-research-active">✨ Em Investigação</span>';
+                } else if (isScheduled) {
+                    badgeActive = '<span class="badge-research-active" style="background: rgba(14, 165, 233, 0.2); border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">⏳ Agendada na Fila</span>';
+                } else if (hasEnoughPoints) {
+                    badgeActive = '<span class="badge-research-ready">🟢 Pronto para Pesquisar</span>';
+                } else {
+                    badgeActive = `<span class="badge-research-lack">🔴 Faltam ${formatNumber(diff)} pts</span>`;
+                }
 
                 let actionBtnHtml = '';
                 if (isActive) {
-                    actionBtnHtml = `<button class="btn btn-ghost btn-sm" disabled>Em Andamento</button>`;
+                    actionBtnHtml = `<button class="btn btn-ghost btn-sm" disabled>⚡ Em Investigação</button>`;
                 } else if (isScheduled) {
-                    actionBtnHtml = `<button class="btn btn-outline btn-sm" disabled>Agendada na Fila</button>`;
+                    actionBtnHtml = `<button class="btn btn-outline btn-sm" disabled>⏳ Agendada na Fila</button>`;
                 } else if (hasEnoughPoints) {
-                    actionBtnHtml = `<button class="btn btn-primary btn-sm btn-start-research" data-index="${r.index}" data-name="${r.name}" data-cost="${costNum}">Investigar Agora</button>`;
+                    actionBtnHtml = `<button class="btn btn-primary btn-sm btn-start-research" data-index="${r.index}" data-name="${r.name}" data-cost="${costNum}">🔬 Investigar Agora</button>`;
                 } else {
-                    const diff = costNum - currentPoints;
                     actionBtnHtml = `
                         <button class="btn btn-secondary btn-sm btn-schedule-research" data-index="${r.index}" data-name="${r.name}" data-cost="${costNum}" title="Faltam ${formatNumber(diff)} pontos. Agende para pesquisar automaticamente assim que acumular!">
-                            Agendar Pesquisa (faltam ${formatNumber(diff)} pts)
+                            ⏳ Agendar Pesquisa (faltam ${formatNumber(diff)} pts)
                         </button>
                     `;
                 }
@@ -1557,9 +1648,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             <h4 class="research-title">${r.name}</h4>
                             <p class="research-desc">${r.description || 'Pesquisa disponível para avanço do seu império.'}</p>
                             
-                            <div class="research-meta-row">
-                                <span class="research-cost-pill ${hasEnoughPoints ? 'sufficient' : 'insufficient'}">🧪 Custo: <strong>${formatNumber(costNum)} pts</strong></span>
-                                <span class="research-status-pill ${isActive ? 'active' : ''}">${isActive ? 'Em Andamento' : (isScheduled ? 'Agendada' : (hasEnoughPoints ? 'Pronto' : 'Pontos insuficientes'))}</span>
+                            <div class="research-progress-section">
+                                <div class="research-progress-header">
+                                    <span class="progress-label">Progresso do Conhecimento:</span>
+                                    <span class="progress-pct-val">${progPct}%</span>
+                                </div>
+                                <div class="research-progress-track">
+                                    <div class="research-progress-fill ${hasEnoughPoints ? 'complete' : ''}" style="width: ${progPct}%;"></div>
+                                </div>
+                                <div class="research-points-detail">
+                                    <span>Acumulado: <b>${formatNumber(currentPoints)}</b> / <b>${formatNumber(costNum)} pts</b></span>
+                                    ${!hasEnoughPoints && estTime ? `<span class="research-estimate-tag" title="Tempo estimado para atingir os pontos com os cientistas atuais">⏱️ ${estTime}</span>` : (hasEnoughPoints ? `<span class="research-surplus-tag">✓ Saldo restante: +${formatNumber(currentPoints - costNum)} pts</span>` : '')}
+                                </div>
                             </div>
                         </div>
 

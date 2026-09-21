@@ -545,7 +545,7 @@ def api_cities():
 
 @app.route("/api/city/<city_id>/buildings", methods=["GET"])
 def api_city_buildings(city_id):
-    """Lista todos os edifícios e níveis atuais da cidade com tradução pt-BR."""
+    """Lista todos os edifícios e níveis atuais da cidade com tradução pt-BR e prévia de custos."""
     session = get_or_create_session()
     if not session:
         return jsonify({"error": "Não conectado"}), 401
@@ -560,23 +560,74 @@ def api_city_buildings(city_id):
         except Exception as e:
             return jsonify({"error": f"Cidade não encontrada: {e}"}), 404
 
+    from ikabot.helpers.building_costs import calculate_building_upgrade_cost
+
     buildings_list = []
     for pos in city.get("position", []):
         building_id = pos.get("building", "empty")
         building_name_pt = translate_building(building_id)
         level = pos.get("level", 0)
+        level_int = int(level) if level is not None else 0
+
+        upgrade_cost = None
+        if building_id not in ["empty", "buildingGround"]:
+            try:
+                upgrade_cost = calculate_building_upgrade_cost(session, city, pos, level_int, level_int + 1)
+            except Exception as e:
+                logger.debug(f"Não foi possível calcular prévia de custo para {building_id}: {e}")
 
         buildings_list.append({
             "position": pos.get("position", 0),
             "building_id": building_id,
             "name_pt": building_name_pt,
-            "level": level if level is not None else 0,
+            "level": level_int,
             "is_busy": pos.get("isBusy", False),
             "can_upgrade": pos.get("canUpgrade", True),
             "is_empty": building_id in ["empty", "buildingGround"],
+            "upgrade_cost": upgrade_cost,
         })
 
     return jsonify({"city_id": city_id, "buildings": buildings_list})
+
+
+@app.route("/api/city/<city_id>/building/<int:position>/cost", methods=["GET"])
+def api_city_building_cost(city_id, position):
+    """Calcula dinamicamente os recursos exigidos para evoluir o edifício até target_level."""
+    session = get_or_create_session()
+    if not session:
+        return jsonify({"success": False, "error": "Sessão não conectada"}), 401
+
+    target_level = request.args.get("target_level", type=int)
+
+    cities_dict = fetch_all_cities_data(session)
+    city = cities_dict.get(str(city_id))
+    if not city:
+        try:
+            html = session.get(config.city_url + str(city_id))
+            city = getCity(html)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Cidade não encontrada: {e}"}), 404
+
+    target_pos = None
+    for pos in city.get("position", []):
+        if pos.get("position") == position:
+            target_pos = pos
+            break
+
+    if not target_pos:
+        return jsonify({"success": False, "error": f"Posição {position} não encontrada nesta cidade."}), 404
+
+    current_level = int(target_pos.get("level", 0) or 0)
+    if not target_level or target_level <= current_level:
+        target_level = current_level + 1
+
+    try:
+        from ikabot.helpers.building_costs import calculate_building_upgrade_cost
+        cost_data = calculate_building_upgrade_cost(session, city, target_pos, current_level, target_level)
+        return jsonify(cost_data)
+    except Exception as e:
+        logger.error(f"Erro ao calcular custo de evolução (cidade {city_id}, pos {position}): {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/city/<city_id>/queue", methods=["GET"])
@@ -1406,6 +1457,40 @@ def api_research_status():
 
         time_remaining = str(raw_time).strip() if raw_time and str(raw_time).strip() != "-" else ""
         curr_focus = str(studies.get("js_researchAdvisorCurrResearchType", ""))
+
+        # Enriquecimento das tecnologias disponíveis com cálculo de progresso e estimativas
+        for item in available:
+            cost_str = str(item.get("cost", "0"))
+            cost_clean = re.sub(r'[^\d]', '', cost_str)
+            cost_num = int(cost_clean) if cost_clean else 0
+            has_enough = points_count >= cost_num if cost_num > 0 else True
+            diff = max(0, cost_num - points_count)
+
+            est_str = ""
+            if diff > 0 and prod_count > 0:
+                total_mins = int(round((diff / prod_count) * 60))
+                hrs = total_mins // 60
+                mins = total_mins % 60
+                if hrs >= 24:
+                    days = hrs // 24
+                    rem_hrs = hrs % 24
+                    est_str = f"~{days}d {rem_hrs}h"
+                elif hrs > 0:
+                    est_str = f"~{hrs}h {mins}m"
+                else:
+                    est_str = f"~{mins}m"
+            elif diff == 0:
+                est_str = "Pronto para pesquisar"
+            else:
+                est_str = "Sem cientistas ativos"
+
+            prog_pct = min(100.0, round((points_count / max(1, cost_num)) * 100, 1)) if cost_num > 0 else 100.0
+
+            item["cost_num"] = cost_num
+            item["has_enough_points"] = has_enough
+            item["points_diff"] = diff
+            item["progress_pct"] = prog_pct
+            item["estimated_time_str"] = est_str
 
         # Obter pesquisas agendadas persistentes
         scheduled_researches = []
