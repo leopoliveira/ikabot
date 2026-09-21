@@ -86,6 +86,7 @@ FullCityDict = TypedDict(
         "wineConsumptionPerHour": int,
         "resourcesListedForSale": list[int],
         "freeSpaceForResources": list[int],
+        "tradegood": Optional[int],
     },
 )
 
@@ -427,6 +428,21 @@ def getCity(html: str) -> FullCityDict:
             - city["availableResources"][i]
             - city["resourcesListedForSale"][i]
         )
+
+    # Identifica o recurso de luxo (tradegood) produzido na ilha desta cidade (1=vinho, 2=mármore, 3=cristal, 4=enxofre)
+    tradegood = None
+    tg_match = re.search(r'tradegood(?:&amp;|&)type=(\d+)', html)
+    if tg_match:
+        tradegood = int(tg_match.group(1))
+    else:
+        prod_tg = re.search(r'producedTradegood:\s*["\']?(\d+)["\']?', html)
+        if prod_tg:
+            tradegood = int(prod_tg.group(1))
+        else:
+            rel_tg = re.search(r'\\"id\\":' + str(city["id"]) + r'.*?\\"tradegood\\":\s*["\']?(\d+)["\']?', html)
+            if rel_tg:
+                tradegood = int(rel_tg.group(1))
+    city["tradegood"] = tradegood
 
     return city
 

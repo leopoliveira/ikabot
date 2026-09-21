@@ -373,3 +373,73 @@ def research(session, event, stdin_fd, predetermined_input):
     except KeyboardInterrupt:
         event.set()
         return
+
+
+def web_research_worker(session, study_index, research_name, required_points, task_id=None):
+    """
+    Worker autônomo headless que monitora os pontos de pesquisa acumulados na conta.
+    Quando os pontos atingirem o valor necessário, submete a pesquisa automaticamente.
+    """
+    set_child_mode(session)
+    study_index = int(study_index)
+    required_points = int(required_points)
+
+    try:
+        from ikabot.helpers.taskManager import update_task, complete_task
+    except Exception:
+        update_task, complete_task = None, None
+
+    try:
+        info = f"\nFila de Pesquisa Web\nPesquisa: {research_name} (custo {required_points} pts)\n"
+        setInfoSignal(session, info)
+        status_msg = f"Pesquisa agendada: {research_name} ({required_points} pts)"
+        session.setStatus(status_msg)
+        if task_id and update_task:
+            update_task(task_id, status="running", current_status=status_msg)
+
+        while True:
+            studies = get_studies(session)
+            points_raw = studies.get("js_researchAdvisorPoints", 0)
+            try:
+                current_points = int(str(points_raw).replace(".", "").replace(",", "").strip())
+            except Exception:
+                current_points = 0
+
+            if current_points >= required_points:
+                # Pontos atingidos! Executa a pesquisa oficial
+                session.setStatus(f"Executando pesquisa: {research_name}...")
+                study(session, studies, study_index)
+                finish_msg = f"Pesquisa concluída com sucesso: {research_name}!"
+                session.setStatus(finish_msg)
+                if task_id and complete_task:
+                    complete_task(task_id, message=finish_msg)
+                break
+
+            # Calcula tempo restante estimado
+            hourly_prod_raw = studies.get("js_researchAdvisorTime", 0)
+            try:
+                hourly_prod = int(str(hourly_prod_raw).replace(".", "").replace(",", "").strip())
+            except Exception:
+                hourly_prod = 0
+
+            diff = required_points - current_points
+            time_str = ""
+            if hourly_prod > 0:
+                hours_left = diff / hourly_prod
+                time_str = f", ~{hours_left:.1f}h restantes"
+
+            wait_msg = f"Aguardando pontos: {current_points}/{required_points} pts (faltam {diff}{time_str})"
+            session.setStatus(wait_msg)
+            if task_id and update_task:
+                update_task(task_id, current_status=wait_msg, current_points=current_points)
+
+            # Aguarda 5 minutos antes da próxima verificação
+            time.sleep(300)
+
+    except Exception as e:
+        session.logger.error(f"Erro na fila de pesquisa web ({research_name}): {e}", exc_info=True)
+        session.setStatus(f"Erro na pesquisa: {str(e)}")
+        if task_id and update_task:
+            update_task(task_id, status="error", error=str(e))
+    finally:
+        session.logout()

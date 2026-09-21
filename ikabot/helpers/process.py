@@ -65,7 +65,14 @@ def updateProcessList(session, programprocesslist=[]):
         # windows doesn't support the status method
         isAlive = True if isWindows else proc.status() != "zombie"
 
-        if proc.name() == ika_process and isAlive:
+        proc_name_lower = proc.name().lower()
+        ika_proc_lower = ika_process.lower()
+        is_same_proc = (
+            proc_name_lower == ika_proc_lower
+            or ("python" in proc_name_lower and "python" in ika_proc_lower)
+        )
+
+        if is_same_proc and isAlive:
             runningIkabotProcessList.append(process)
 
     # add new to the list and write to file only if it's given (dedup by pid)

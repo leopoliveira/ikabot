@@ -802,3 +802,101 @@ def constructionList(session, event, stdin_fd, predetermined_input):
         sendToBot(session, msg)
     finally:
         session.logout()
+
+
+def web_construction_worker(session, city_id, position, target_level, task_id=None):
+    """
+    Worker autônomo para a Interface Web que gerencia a fila de evolução de um edifício.
+    Roda em background de forma headless (sem prompts interativos de terminal),
+    aguarda a conclusão de construções em andamento, verifica recursos e executa
+    o upgrade nível por nível até atingir target_level.
+    """
+    set_child_mode(session)
+    city_id = str(city_id)
+    position = int(position)
+    target_level = int(target_level)
+
+    try:
+        from ikabot.helpers.taskManager import update_task, complete_task
+    except Exception:
+        update_task, complete_task = None, None
+
+    try:
+        html = session.get(city_url + city_id)
+        city = getCity(html)
+        city_name = city.get("cityName", f"Cidade {city_id}")
+        
+        building = city["position"][position]
+        building_name = building.get("name", "Edifício")
+        building_type = building.get("building", "")
+
+        info = f"\nFila de Construção Web\nCidade: {city_name}\nEdifício: {building_name} (posição {position}) até nv {target_level}\n"
+        setInfoSignal(session, info)
+        status_msg = f"Fila: {building_name} até nv {target_level} em {city_name}"
+        session.setStatus(status_msg)
+        if task_id and update_task:
+            update_task(task_id, status="running", current_status=status_msg)
+
+        while True:
+            # 1. Aguarda qualquer construção em andamento na cidade terminar
+            city = waitForConstruction(session, city_id, target_level)
+            building = city["position"][position]
+            current_level = int(building.get("level", 0))
+
+            if current_level >= target_level:
+                finish_msg = f"Concluído: {building_name} nv {target_level} em {city_name}!"
+                session.setStatus(finish_msg)
+                if task_id and complete_task:
+                    complete_task(task_id, message=finish_msg)
+                break
+
+            # 2. Se o edifício ainda estiver ocupado, aguarda um pouco
+            if building.get("isBusy", False):
+                time.sleep(15)
+                continue
+
+            # 3. Verifica se tem recursos para evoluir agora
+            can_upgrade = building.get("canUpgrade", False)
+            if not can_upgrade:
+                res_msg = f"Aguardando recursos: {building_name} {current_level}➔{current_level+1} em {city_name}"
+                session.setStatus(res_msg)
+                if task_id and update_task:
+                    update_task(task_id, current_status=res_msg)
+                time.sleep(60)
+                continue
+
+            # 4. Envia o comando oficial de expansão
+            up_msg = f"Evoluindo: {building_name} {current_level}➔{current_level+1} em {city_name}..."
+            session.setStatus(up_msg)
+            if task_id and update_task:
+                update_task(task_id, current_status=up_msg)
+            url = (
+                f"action=UpgradeExistingBuilding&actionRequest={actionRequest}"
+                f"&cityId={city_id}&position={position:d}&level={current_level}"
+                f"&activeTab=tabSendTransporter&backgroundView=city&currentCityId={city_id}"
+                f"&templateView={building_type}&ajax=1"
+            )
+            session.post(url)
+            time.sleep(4)
+
+            # 5. Confirma se iniciou
+            html = session.get(city_url + city_id)
+            city = getCity(html)
+            building = city["position"][position]
+
+            if building.get("isBusy", False):
+                busy_msg = f"Em evolução: {building_name} nv {current_level+1} em {city_name}"
+                session.setStatus(busy_msg)
+                if task_id and update_task:
+                    update_task(task_id, current_status=busy_msg)
+            else:
+                time.sleep(15)
+
+    except Exception as e:
+        session.logger.error(f"Erro na fila de construção web (cidade {city_id}, pos {position}): {e}", exc_info=True)
+        session.setStatus(f"Erro na construção: {str(e)}")
+        if task_id and update_task:
+            update_task(task_id, status="error", error=str(e))
+    finally:
+        session.logout()
+

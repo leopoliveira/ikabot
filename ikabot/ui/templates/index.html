@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ikabot - Painel de Controle (Brasil)</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=8">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- CABEÇALHO SUPERIOR (LARGURA TOTAL NO TOPO COM BRAND E STATS) -->
+        <header class="top-header">
+            <div class="header-brand">
+                <div class="brand-logo">🏛️</div>
+                <div class="brand-info">
+                    <h1>IKABOT <span class="badge-br">BRASIL</span></h1>
+                    <p class="subtitle">Automação e Gestão Inteligente para Ikariam</p>
+                </div>
+            </div>
+
+            <div class="header-stats">
+                <div class="stat-card" id="status-card">
+                    <span class="status-dot disconnected" id="status-dot"></span>
+                    <div class="stat-content">
+                        <span class="stat-label">Conexão</span>
+                        <span class="stat-value" id="status-text">Conectando...</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-icon">👑</span>
+                    <div class="stat-content">
+                        <span class="stat-label">Jogador / Servidor</span>
+                        <span class="stat-value" id="player-server">Carregando...</span>
+                    </div>
+                </div>
+
+                <!-- SELETOR GLOBAL DE CIDADE UNIFICADO -->
+                <div class="stat-card global-city-stat-card" id="global-city-stat-card" title="Cidade ativa selecionada para todas as funcionalidades">
+                    <span class="stat-icon">🏛️</span>
+                    <div class="stat-content">
+                        <span class="stat-label">Cidade Ativa (Global)</span>
+                        <select id="global-city-select" class="global-city-select-input">
+                            <option value="">Carregando cidades...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-icon">🪙</span>
+                    <div class="stat-content">
+                        <span class="stat-label">Ouro Total</span>
+                        <div class="gold-stat-wrapper">
+                            <span class="stat-value gold" id="total-gold">0</span>
+                            <span class="stat-sub" id="gold-income">(+0/h)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-icon">🚢</span>
+                    <div class="stat-content">
+                        <span class="stat-label">Barcos Mercantes</span>
+                        <span class="stat-value" id="total-ships">0 / 0</span>
+                    </div>
+                </div>
+
+                <button class="btn-refresh" id="btn-refresh" title="Atualizar dados agora (Auto-atualização ativa a cada 10 min)">
+                    ↻ Atualizar
+                </button>
+
+                <button class="btn btn-outline btn-sm" id="btn-open-login" title="Conectar ou trocar conta">
+                    Conectar Conta
+                </button>
+            </div>
+        </header>
+
+        <!-- CORPO PRINCIPAL: MENU LATERAL NA ESQUERDA + CONTEÚDO NA DIREITA -->
+        <div class="dashboard-body">
+            <aside class="sidebar-container" id="app-sidebar">
+                <div class="sidebar-section-header">Módulos</div>
+                <nav class="main-nav">
+                    <button class="nav-tab active" data-tab="tab-cities">
+                        <span class="tab-icon">🏛</span>
+                        <span class="tab-text">Cidades</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-construction">
+                        <span class="tab-icon">⚒</span>
+                        <span class="tab-text">Construções</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-workers">
+                        <span class="tab-icon">👤</span>
+                        <span class="tab-text">Trabalhadores</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-transport">
+                        <span class="tab-icon">⛵</span>
+                        <span class="tab-text">Transporte</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-military">
+                        <span class="tab-icon">⚔</span>
+                        <span class="tab-text">Militar & Frotas</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-market">
+                        <span class="tab-icon">⚖</span>
+                        <span class="tab-text">Mercado</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-logistics">
+                        <span class="tab-icon">📦</span>
+                        <span class="tab-text">Logística</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-donations">
+                        <span class="tab-icon">🪙</span>
+                        <span class="tab-text">Doações</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-research">
+                        <span class="tab-icon">🔬</span>
+                        <span class="tab-text">Pesquisas</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-miracles">
+                        <span class="tab-icon">⚡</span>
+                        <span class="tab-text">Milagres</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-piracy">
+                        <span class="tab-icon">⚓</span>
+                        <span class="tab-text">Pirataria</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-barbarians">
+                        <span class="tab-icon">🛡</span>
+                        <span class="tab-text">Bárbaros</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-world">
+                        <span class="tab-icon">🗺</span>
+                        <span class="tab-text">Mundo</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-alerts">
+                        <span class="tab-icon">🔔</span>
+                        <span class="tab-text">Alertas</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-tasks">
+                        <span class="tab-icon">📋</span>
+                        <span class="tab-text">Tarefas & Logs</span>
+                        <span class="badge-count" id="running-tasks-count">0</span>
+                    </button>
+                    <button class="nav-tab" data-tab="tab-settings">
+                        <span class="tab-icon">⚙</span>
+                        <span class="tab-text">Configurações</span>
+                    </button>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-version-pill">
+                        <span class="version-tag">Ikabot v7.6.1</span>
+                        <span class="version-dot"></span>
+                        <span class="version-flag">Brasil</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- CONTEÚDO PRINCIPAL -->
+            <main class="main-content">
+            <!-- ABA 1: CIDADES & RECURSOS -->
+            <section class="tab-content active" id="tab-cities">
+                <div class="section-header">
+                    <h2>🏛️ Suas Cidades e Colônias</h2>
+                    <p class="section-desc">Visão consolidada dos estoques, capacidade de armazém e produção.</p>
+                </div>
+                <div class="cities-grid" id="cities-container">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Carregando cidades do império...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: FILA DE CONSTRUÇÕES -->
+            <section class="tab-content" id="tab-construction">
+                <div class="section-header">
+                    <h2>🔨 Fila de Construções</h2>
+                    <p class="section-desc">Selecione uma cidade, veja os níveis atuais e agende a evolução dos edifícios sem precisar digitar códigos.</p>
+                </div>
+                <div class="card form-card">
+                    <!-- BARRA DE CIDADE ATIVA GLOBAL -->
+                    <div class="active-city-bar">
+                        <div class="active-city-content">
+                            <span class="active-city-chip">🏛️ Cidade Ativa:</span>
+                            <span class="active-city-name active-city-display-target">Selecione uma cidade no cabeçalho</span>
+                        </div>
+                        <span class="active-city-hint">💡 Para trocar de cidade, use o seletor no cabeçalho acima ⬆️</span>
+                    </div>
+                    <select id="construction-city-select" style="display: none;"></select>
+
+                    <!-- PAINEL DA FILA E OBRAS ATIVAS NA CIDADE -->
+                    <div id="city-queue-section" class="city-queue-panel" style="display: none;">
+                        <div class="city-queue-header">
+                            <div class="queue-title-group">
+                                <h3>📋 Fila de Construção e Obras Ativas nesta Cidade</h3>
+                                <span class="badge badge-warning" id="city-queue-badge">1 em andamento</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline" id="btn-refresh-city-queue">
+                                🔄 Atualizar Fila
+                            </button>
+                        </div>
+                        <div id="city-queue-container" class="city-queue-items">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+
+                    <!-- BARRA DE FERRAMENTAS E FILTROS DE EDIFÍCIOS -->
+                    <div class="buildings-toolbar-wrap" style="margin-top: 24px; margin-bottom: 14px;">
+                        <div class="buildings-section-header-bar">
+                            <div>
+                                <h3 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                    🏛️ Edifícios Disponíveis na Cidade (<span id="buildings-count-disp">0</span>)
+                                </h3>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                                    Escolha o nível alvo usando os seletores rápidos e agende com 1 clique.
+                                </p>
+                            </div>
+                            <div class="buildings-search-box">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="input-search-building" class="form-control form-control-sm" placeholder="Buscar por nome do edifício...">
+                            </div>
+                        </div>
+
+                        <div class="buildings-filter-pills" id="buildings-filter-chips">
+                            <button type="button" class="b-filter-chip active" data-cat="all">Todos</button>
+                            <button type="button" class="b-filter-chip" data-cat="governo">🏛️ Governo</button>
+                            <button type="button" class="b-filter-chip" data-cat="estoque">📦 Armazém</button>
+                            <button type="button" class="b-filter-chip" data-cat="militar">⚔️ Militar</button>
+                            <button type="button" class="b-filter-chip" data-cat="ciencia">🔬 Ciência & Cultura</button>
+                            <button type="button" class="b-filter-chip" data-cat="economia">🪵 Produção & Redutores</button>
+                        </div>
+                    </div>
+
+                    <div id="buildings-list-container" class="buildings-grid-modern">
+                        <p class="empty-hint">Selecione uma cidade acima para carregar a lista de edifícios.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: TRABALHADORES & ECONOMIA -->
+            <section class="tab-content" id="tab-workers">
+                <div class="section-header">
+                    <h2>👥 Gestão de Trabalhadores e Cidadãos</h2>
+                    <p class="section-desc">Aloque trabalhadores na Serraria, na Jazida de Luxo da ilha e Cientistas na Academia.</p>
+                </div>
+                <div class="card form-card">
+                    <!-- BARRA DE CIDADE ATIVA GLOBAL -->
+                    <div class="active-city-bar">
+                        <div class="active-city-content">
+                            <span class="active-city-chip">🏛️ Cidade Ativa:</span>
+                            <span class="active-city-name active-city-display-target">Selecione uma cidade no cabeçalho</span>
+                        </div>
+                        <span class="active-city-hint">💡 Para trocar de cidade, use o seletor no cabeçalho acima ⬆️</span>
+                    </div>
+                    <select id="workers-city-select" style="display: none;"></select>
+
+                    <!-- Indicador de Carregamento ao trocar de cidade -->
+                    <div id="workers-loading-indicator" class="loading-state" style="display: none; padding: 30px 10px;">
+                        <div class="spinner"></div>
+                        <p id="workers-loading-text" style="color: var(--color-gold); font-weight: 500;">
+                            🔄 Consultando capacidade e trabalhadores da cidade...
+                        </p>
+                    </div>
+
+                    <div id="workers-empty-hint" class="empty-hint">
+                        🏛️ Selecione uma cidade acima para ver e ajustar a distribuição de trabalhadores.
+                    </div>
+
+                    <div class="city-workers-info-box" id="workers-city-info" style="display: none;">
+                        <div class="workers-summary-banner">
+                            <div class="summary-metric">
+                                <span class="metric-label">👥 Cidadãos Livres Disponíveis na Cidade:</span>
+                                <span class="metric-val highlight" id="info-free-citizens">0</span>
+                            </div>
+                            <div class="summary-tip">
+                                <span>💡 Cidadãos livres geram <b>3 de ouro/hora</b> cada um. Ao alocá-los nas minas ou na academia, eles deixam de gerar ouro para produzir recursos ou pontos de pesquisa.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="workers-controls" id="workers-form" style="display: none; display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Serraria -->
+                        <div class="worker-card" id="card-wood-workers">
+                            <div class="worker-card-header">
+                                <div class="worker-title-area">
+                                    <span class="worker-icon">🪵</span>
+                                    <div>
+                                        <h4 class="worker-facility-name">Serraria da Ilha (Material de Construção)</h4>
+                                        <p class="worker-facility-desc">Extrai Madeira para expansão de edifícios, frotas e defesas.</p>
+                                    </div>
+                                </div>
+                                <div class="worker-ratio-badge" id="badge-wood-ratio">
+                                    <span class="ratio-current" id="val-wood-workers">0</span>
+                                    <span class="ratio-divider">/</span>
+                                    <span class="ratio-max" id="max-wood-workers">0</span>
+                                    <span class="ratio-pct" id="pct-wood-workers">(0%)</span>
+                                </div>
+                            </div>
+                            <div class="worker-slider-wrapper">
+                                <div class="worker-track-bg">
+                                    <div class="worker-track-fill" id="track-wood-fill" style="width: 0%;"></div>
+                                </div>
+                                <input type="range" id="slider-wood-workers" min="0" max="100" value="0" class="slider custom-worker-slider">
+                            </div>
+                            <div class="worker-card-footer">
+                                <div class="worker-limits-info" id="limit-wood-workers">
+                                    Capacidade normal: <b>0</b> | Sobrecarga máx: até <b>0</b>
+                                </div>
+                                <div class="worker-quick-actions">
+                                    <button type="button" class="btn-preset" data-target="wood" data-val="0">Mín (0)</button>
+                                    <button type="button" class="btn-preset" data-target="wood" data-val="normal">Normal</button>
+                                    <button type="button" class="btn-preset" data-target="wood" data-val="max">Máx</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Jazida de Luxo -->
+                        <div class="worker-card" id="card-luxury-workers">
+                            <div class="worker-card-header">
+                                <div class="worker-title-area">
+                                    <span class="worker-icon" id="icon-luxury-workers">💎</span>
+                                    <div>
+                                        <h4 class="worker-facility-name" id="label-luxury-workers">Jazida de Recursos de Luxo</h4>
+                                        <p class="worker-facility-desc" id="desc-luxury-workers">Extrai o recurso especial da ilha para sustento e desenvolvimento.</p>
+                                    </div>
+                                </div>
+                                <div class="worker-ratio-badge" id="badge-luxury-ratio">
+                                    <span class="ratio-current" id="val-luxury-workers">0</span>
+                                    <span class="ratio-divider">/</span>
+                                    <span class="ratio-max" id="max-luxury-workers">0</span>
+                                    <span class="ratio-pct" id="pct-luxury-workers">(0%)</span>
+                                </div>
+                            </div>
+                            <div class="worker-slider-wrapper">
+                                <div class="worker-track-bg">
+                                    <div class="worker-track-fill luxury" id="track-luxury-fill" style="width: 0%;"></div>
+                                </div>
+                                <input type="range" id="slider-luxury-workers" min="0" max="100" value="0" class="slider custom-worker-slider">
+                            </div>
+                            <div class="worker-card-footer">
+                                <div class="worker-limits-info" id="limit-luxury-workers">
+                                    Capacidade normal: <b>0</b> | Sobrecarga máx: até <b>0</b>
+                                </div>
+                                <div class="worker-quick-actions">
+                                    <button type="button" class="btn-preset" data-target="luxury" data-val="0">Mín (0)</button>
+                                    <button type="button" class="btn-preset" data-target="luxury" data-val="normal">Normal</button>
+                                    <button type="button" class="btn-preset" data-target="luxury" data-val="max">Máx</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cientistas na Academia -->
+                        <div class="worker-card" id="group-scientists" style="display: none;">
+                            <div class="worker-card-header">
+                                <div class="worker-title-area">
+                                    <span class="worker-icon">🔬</span>
+                                    <div>
+                                        <h4 class="worker-facility-name">Academia da Cidade (Cientistas)</h4>
+                                        <p class="worker-facility-desc">Gera Pontos de Pesquisa contínuos (cada cientista consome 6 ouro/h).</p>
+                                    </div>
+                                </div>
+                                <div class="worker-ratio-badge" id="badge-scientists-ratio">
+                                    <span class="ratio-current" id="val-scientists-workers">0</span>
+                                    <span class="ratio-divider">/</span>
+                                    <span class="ratio-max" id="max-scientists-workers">0</span>
+                                    <span class="ratio-pct" id="pct-scientists-workers">(0%)</span>
+                                </div>
+                            </div>
+                            <div class="worker-slider-wrapper">
+                                <div class="worker-track-bg">
+                                    <div class="worker-track-fill science" id="track-scientists-fill" style="width: 0%;"></div>
+                                </div>
+                                <input type="range" id="slider-scientists" min="0" max="100" value="0" class="slider custom-worker-slider">
+                            </div>
+                            <div class="worker-card-footer">
+                                <div class="worker-limits-info" id="limit-scientists">
+                                    Capacidade da Academia: até <b>0</b> cientistas
+                                </div>
+                                <div class="worker-quick-actions">
+                                    <button type="button" class="btn-preset" data-target="scientists" data-val="0">Mín (0)</button>
+                                    <button type="button" class="btn-preset" data-target="scientists" data-val="max">Máx</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 8px;">
+                            <button class="btn btn-primary btn-lg" id="btn-save-workers" style="width: 100%;">
+                                Salvar Alocação de Trabalhadores
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 4: TRANSPORTE DE RECURSOS -->
+            <section class="tab-content" id="tab-transport">
+                <div class="section-header">
+                    <h2>Transporte de Cargas</h2>
+                    <p class="section-desc">Despache barcos mercantes para transferir recursos com segurança entre suas colônias.</p>
+                </div>
+                <div class="card form-card transport-main-card">
+                    <!-- ROTA: ORIGEM & DESTINO -->
+                    <div class="transport-route-grid">
+                        <div class="transport-city-box origin-box">
+                            <div class="route-box-header">
+                                <span class="route-tag origin-tag">Origem</span>
+                                <span class="route-city-coord" id="trans-origin-coord"></span>
+                            </div>
+                            <select id="transport-origin" class="form-control select-route"></select>
+                        </div>
+
+                        <div class="route-arrow-wrap">
+                            <div class="route-arrow-icon">➔</div>
+                        </div>
+
+                        <div class="transport-city-box dest-box">
+                            <div class="route-box-header">
+                                <span class="route-tag dest-tag">Destino</span>
+                                <span class="route-city-coord" id="trans-dest-coord"></span>
+                            </div>
+                            <select id="transport-dest" class="form-control select-route"></select>
+                        </div>
+                    </div>
+
+                    <!-- GRID DE 5 RECURSOS EM CARDS ESTILIZADOS -->
+                    <div class="transport-resources-container">
+                        <div class="transport-resources-title">Selecione as mercadorias para carregar:</div>
+                        <div class="resources-input-grid">
+                            <!-- Madeira -->
+                            <div class="res-input-card res-wood">
+                                <div class="res-card-top">
+                                    <span class="res-name"><span class="res-dot dot-wood"></span> Madeira</span>
+                                    <span class="res-stock" id="stock-wood">Disp: 0</span>
+                                </div>
+                                <div class="res-input-wrap">
+                                    <input type="number" id="trans-wood" min="0" value="0" class="form-control res-amount-input">
+                                </div>
+                                <div class="res-quick-actions">
+                                    <button type="button" class="btn-res-quick btn-res-zero" data-res="wood">Zerar</button>
+                                    <button type="button" class="btn-res-quick btn-res-max" data-res="wood">Máx</button>
+                                </div>
+                            </div>
+
+                            <!-- Vinho -->
+                            <div class="res-input-card res-wine">
+                                <div class="res-card-top">
+                                    <span class="res-name"><span class="res-dot dot-wine"></span> Vinho</span>
+                                    <span class="res-stock" id="stock-wine">Disp: 0</span>
+                                </div>
+                                <div class="res-input-wrap">
+                                    <input type="number" id="trans-wine" min="0" value="0" class="form-control res-amount-input">
+                                </div>
+                                <div class="res-quick-actions">
+                                    <button type="button" class="btn-res-quick btn-res-zero" data-res="wine">Zerar</button>
+                                    <button type="button" class="btn-res-quick btn-res-max" data-res="wine">Máx</button>
+                                </div>
+                            </div>
+
+                            <!-- Mármore -->
+                            <div class="res-input-card res-marble">
+                                <div class="res-card-top">
+                                    <span class="res-name"><span class="res-dot dot-marble"></span> Mármore</span>
+                                    <span class="res-stock" id="stock-marble">Disp: 0</span>
+                                </div>
+                                <div class="res-input-wrap">
+                                    <input type="number" id="trans-marble" min="0" value="0" class="form-control res-amount-input">
+                                </div>
+                                <div class="res-quick-actions">
+                                    <button type="button" class="btn-res-quick btn-res-zero" data-res="marble">Zerar</button>
+                                    <button type="button" class="btn-res-quick btn-res-max" data-res="marble">Máx</button>
+                                </div>
+                            </div>
+
+                            <!-- Cristal -->
+                            <div class="res-input-card res-crystal">
+                                <div class="res-card-top">
+                                    <span class="res-name"><span class="res-dot dot-crystal"></span> Cristal</span>
+                                    <span class="res-stock" id="stock-crystal">Disp: 0</span>
+                                </div>
+                                <div class="res-input-wrap">
+                                    <input type="number" id="trans-crystal" min="0" value="0" class="form-control res-amount-input">
+                                </div>
+                                <div class="res-quick-actions">
+                                    <button type="button" class="btn-res-quick btn-res-zero" data-res="crystal">Zerar</button>
+                                    <button type="button" class="btn-res-quick btn-res-max" data-res="crystal">Máx</button>
+                                </div>
+                            </div>
+
+                            <!-- Enxofre -->
+                            <div class="res-input-card res-sulfur">
+                                <div class="res-card-top">
+                                    <span class="res-name"><span class="res-dot dot-sulfur"></span> Enxofre</span>
+                                    <span class="res-stock" id="stock-sulfur">Disp: 0</span>
+                                </div>
+                                <div class="res-input-wrap">
+                                    <input type="number" id="trans-sulfur" min="0" value="0" class="form-control res-amount-input">
+                                </div>
+                                <div class="res-quick-actions">
+                                    <button type="button" class="btn-res-quick btn-res-zero" data-res="sulfur">Zerar</button>
+                                    <button type="button" class="btn-res-quick btn-res-max" data-res="sulfur">Máx</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PAINEL DE RESUMO DE CARGA & BARCOS MERCANTES -->
+                    <div class="transport-summary-panel">
+                        <div class="transport-summary-stats">
+                            <div class="summary-item">
+                                <span class="summary-item-label">Carga Total Selecionada:</span>
+                                <span class="summary-item-value" id="trans-total-cargo">0 unidades</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-item-label">Barcos Necessários:</span>
+                                <span class="summary-item-value" id="trans-ships-needed">0 / 0 disponíveis</span>
+                            </div>
+                        </div>
+
+                        <div class="transport-capacity-wrap">
+                            <div class="capacity-bar-bg">
+                                <div class="capacity-bar-fill" id="trans-capacity-bar" style="width: 0%;"></div>
+                            </div>
+                            <span class="capacity-status-text" id="trans-capacity-text">Nenhuma mercadoria carregada</span>
+                        </div>
+
+                        <div class="transport-actions-row">
+                            <button type="button" class="btn btn-outline btn-sm" id="btn-trans-clear-all">Limpar Tudo</button>
+                            <button class="btn btn-success btn-lg" id="btn-send-resources">
+                                Despachar Barcos Mercantes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 5: DOAÇÕES DA ILHA -->
+            <section class="tab-content" id="tab-donations">
+                <div class="section-header">
+                    <h2>🪙 Doações para a Ilha (Serraria & Jazida)</h2>
+                    <p class="section-desc">Evolua as minas da sua ilha doando Madeira para acelerar a taxa de extração.</p>
+                </div>
+                <div class="card form-card">
+                    <!-- BARRA DE CIDADE ATIVA GLOBAL -->
+                    <div class="active-city-bar">
+                        <div class="active-city-content">
+                            <span class="active-city-chip">🏛️ Ilha da Cidade Ativa:</span>
+                            <span class="active-city-name active-city-display-target">Selecione uma cidade no cabeçalho</span>
+                        </div>
+                        <span class="active-city-hint">💡 Para doar para outra ilha, troque a cidade ativa no cabeçalho acima ⬆️</span>
+                    </div>
+                    <select id="donation-city-select" style="display: none;"></select>
+
+                    <div id="donation-island-container" class="donation-grid" style="display: none;">
+                        <!-- Card Serraria -->
+                        <div class="card donation-card" id="card-donate-sawmill">
+                            <div class="donation-header">
+                                <h3>🪵 Serraria</h3>
+                                <span class="badge" id="sawmill-lvl-badge">Nível 1</span>
+                            </div>
+                            <div class="donation-progress-wrap">
+                                <div class="progress-labels">
+                                    <span id="sawmill-donated-text">0 / 0 Madeira</span>
+                                    <span id="sawmill-pct-text">0%</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" id="sawmill-progress-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="donation-action-row">
+                                <input type="number" id="input-donate-sawmill" class="form-control" placeholder="Qtd. Madeira" min="1">
+                                <button class="btn btn-primary btn-sm" id="btn-donate-sawmill">🪙 Doar</button>
+                            </div>
+                        </div>
+
+                        <!-- Card Jazida de Luxo -->
+                        <div class="card donation-card" id="card-donate-luxury">
+                            <div class="donation-header">
+                                <h3 id="luxury-mine-title">💎 Jazida de Luxo</h3>
+                                <span class="badge" id="luxury-lvl-badge">Nível 1</span>
+                            </div>
+                            <div class="donation-progress-wrap">
+                                <div class="progress-labels">
+                                    <span id="luxury-donated-text">0 / 0 Madeira</span>
+                                    <span id="luxury-pct-text">0%</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" id="luxury-progress-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="donation-action-row">
+                                <input type="number" id="input-donate-luxury" class="form-control" placeholder="Qtd. Madeira" min="1">
+                                <button class="btn btn-primary btn-sm" id="btn-donate-luxury">🪙 Doar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 6: PESQUISAS NA ACADEMIA -->
+            <section class="tab-content" id="tab-research">
+                <div class="section-header">
+                    <h2>🔬 Pesquisas na Academia</h2>
+                    <p class="section-desc">Consulte suas tecnologias em andamento e inicie novas investigações na Academia.</p>
+                </div>
+
+                <!-- RESUMO GLOBAL DE PONTOS E CIENTISTAS -->
+                <div class="research-summary-banner">
+                    <div class="research-summary-item">
+                        <span class="research-stat-icon">🧪</span>
+                        <div class="research-stat-details">
+                            <span class="research-stat-label">Pontos de Pesquisa Acumulados</span>
+                            <span class="research-stat-value" id="research-points-val">-- pts</span>
+                        </div>
+                    </div>
+                    <div class="research-summary-item">
+                        <span class="research-stat-icon">👥</span>
+                        <div class="research-stat-details">
+                            <span class="research-stat-label">Cientistas em Todas as Cidades</span>
+                            <span class="research-stat-value" id="research-scientists-val">--</span>
+                        </div>
+                    </div>
+                    <div class="research-summary-item">
+                        <span class="research-stat-icon">🎯</span>
+                        <div class="research-stat-details">
+                            <span class="research-stat-label">Foco Atual em Estudo</span>
+                            <span class="research-stat-value highlight" id="research-focus-val">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AVISO EXPLICATIVO DO IKARIAM -->
+                <div class="research-scope-info">
+                    <span class="info-icon">💡</span>
+                    <div class="info-content">
+                        <strong>Por que não há seleção de aldeia aqui?</strong>
+                        <p>No Ikariam, as tecnologias e pesquisas são <strong>globais para toda a sua conta</strong>. Todas as Academias de todas as suas colônias depositam pontos de pesquisa no mesmo cofre imperial. Para escolher quantos cientistas trabalham em cada cidade específica, utilize a aba <strong>👥 Trabalhadores</strong>.</p>
+                    </div>
+                </div>
+
+                <!-- FILA DE PESQUISAS AGENDADAS -->
+                <div id="scheduled-research-container" class="scheduled-research-section" style="display: none; margin-bottom: 20px;">
+                    <div class="scheduled-section-header">
+                        <h4 style="margin: 0; color: #38bdf8;">Pesquisas Agendadas na Fila</h4>
+                        <span class="badge" id="scheduled-research-count">0 agendadas</span>
+                    </div>
+                    <div id="scheduled-research-list" class="scheduled-research-grid"></div>
+                </div>
+
+                <div class="card form-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3>Tecnologias Disponíveis para Estudo</h3>
+                        <button class="btn btn-outline btn-sm" id="btn-refresh-research">↻ Atualizar</button>
+                    </div>
+                    <div id="research-list-container" class="research-grid">
+                        <div class="loading-state" style="grid-column: 1 / -1; padding: 30px;">
+                            <div class="spinner"></div>
+                            <p>Carregando tecnologias disponíveis do império...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 7: AUTO-PIRATARIA -->
+            <section class="tab-content" id="tab-piracy">
+                <div class="section-header">
+                    <h2>🏴‍☠️ Auto-Pirataria (Fortaleza dos Piratas)</h2>
+                    <p class="section-desc">Farme pontos de captura automaticamente e converta em força de tripulação para dominar os mares.</p>
+                </div>
+                <div class="card form-card">
+                    <div class="pirate-info-banner">
+                        <span class="pirate-icon">🏴‍☠️</span>
+                        <div>
+                            <h4>Captura Contínua com Anti-Captcha Integrado</h4>
+                            <p>O Ikabot executa missões repetidamente respeitando o intervalo escolhido e converte pontos em força.</p>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="pirate-mission-select">⏱️ Tipo de Missão de Captura:</label>
+                        <select id="pirate-mission-select" class="form-control">
+                            <option value="1">2.5 minutos (17 Pontos - Mais rápido / Ideal ativo)</option>
+                            <option value="2">7.5 minutos (75 Pontos - Equilibrado)</option>
+                            <option value="3">15 minutos (195 Pontos - Modo seguro)</option>
+                            <option value="4">30 minutos (468 Pontos)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-danger btn-lg" id="btn-start-pirate">
+                        🏴‍☠️ Iniciar Bot de Auto-Pirataria
+                    </button>
+                </div>
+            </section>
+
+            <!-- ABA 8: ALDEIA BÁRBARA -->
+            <section class="tab-content" id="tab-barbarians">
+                <div class="section-header">
+                    <h2>⚔️ Ataques à Aldeia Bárbara</h2>
+                    <p class="section-desc">Farme ouro, madeira e recursos dos bárbaros de forma automática.</p>
+                </div>
+                <div class="card form-card">
+                    <!-- BARRA DE CIDADE ATIVA GLOBAL -->
+                    <div class="active-city-bar">
+                        <div class="active-city-content">
+                            <span class="active-city-chip">🏛️ Cidade de Origem do Ataque:</span>
+                            <span class="active-city-name active-city-display-target">Selecione uma cidade no cabeçalho</span>
+                        </div>
+                        <span class="active-city-hint">💡 Para atacar a partir de outra cidade, troque a cidade ativa no cabeçalho acima ⬆️</span>
+                    </div>
+                    <select id="barbarian-city-select" style="display: none;"></select>
+
+                    <div class="barbarian-actions">
+                        <button class="btn btn-warning btn-lg" id="btn-attack-barbarians">
+                            ⚔️ Iniciar Ataque aos Bárbaros
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 9: ALERTAS & DEFESA -->
+            <section class="tab-content" id="tab-alerts">
+                <div class="section-header">
+                    <h2>🚨 Alertas & Defesa do Império</h2>
+                    <p class="section-desc">Monitore ataques inimigos iminentes e consumo crítico de vinho em segundo plano.</p>
+                </div>
+                <div class="alerts-grid">
+                    <div class="card alert-config-card">
+                        <div class="alert-icon">⚔️</div>
+                        <h3>Alerta de Ataques Inimigos</h3>
+                        <p>Verifica constantemente o conselheiro militar e notifica se tropas hostis estiverem a caminho.</p>
+                        <button class="btn btn-warning" id="btn-alert-attacks">🚨 Ativar Monitor de Ataques</button>
+                    </div>
+                    <div class="card alert-config-card">
+                        <div class="alert-icon">🍷</div>
+                        <h3>Alerta de Vinho Baixo</h3>
+                        <p>Calcula o tempo restante de vinho nas tavernas e alerta antes que a satisfação caia.</p>
+                        <button class="btn btn-primary" id="btn-alert-wine">🍷 Ativar Alerta de Vinho</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 6: TAREFAS & LOGS AO VIVO -->
+            <section class="tab-content" id="tab-tasks">
+                <div class="section-header">
+                    <h2>⚡ Central de Tarefas Ativas e Logs</h2>
+                    <p class="section-desc">Acompanhe todas as ações rodando em segundo plano e veja a execução ao vivo.</p>
+                </div>
+
+                <div class="card table-card">
+                    <h3>📋 Processos em Execução</h3>
+                    <div class="table-responsive">
+                        <table class="data-table" id="tasks-table">
+                            <thead>
+                                <tr>
+                                    <th>PID</th>
+                                    <th>Ação</th>
+                                    <th>Início</th>
+                                    <th>Status Atual</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tasks-tbody">
+                                <tr>
+                                    <td colspan="5" class="empty-hint">Nenhuma tarefa rodando no momento.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card terminal-card">
+                    <div class="terminal-header">
+                        <span class="terminal-title">🖥️ Terminal de Logs ao Vivo</span>
+                        <button class="btn-sm btn-ghost" id="btn-clear-logs">Limpar Tela</button>
+                    </div>
+                    <div class="terminal-body" id="terminal-body">
+                        <div class="log-line info">[00:00:00] Aguardando eventos do sistema...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 7: MILITAR & FROTAS -->
+            <section class="tab-content" id="tab-military">
+                <div class="section-header">
+                    <h2>Militar & Movimentações de Frotas</h2>
+                    <p class="section-desc">Monitore guarnições terrestres e marítimas, acompanhe deslocamentos em trânsito e gerencie ordens militares.</p>
+                </div>
+
+                <div class="subnav-pills">
+                    <button class="subnav-pill active" data-subtab="subtab-military-army">Guarnições e Tropas</button>
+                    <button class="subnav-pill" data-subtab="subtab-military-movements">Frotas em Trânsito</button>
+                    <button class="subnav-pill" data-subtab="subtab-military-train">Recrutar Tropas</button>
+                    <button class="subnav-pill" data-subtab="subtab-military-station">Deslocar Tropas</button>
+                </div>
+
+                <!-- Sub-aba 1: Guarnições -->
+                <div class="subtab-pane active" id="subtab-military-army">
+                    <div class="card">
+                        <div class="card-header-actions">
+                            <h3>Unidades e Frotas nas Cidades</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-refresh-army">Atualizar Guarnições</button>
+                        </div>
+                        <div id="military-army-container" class="army-grid">
+                            <p class="empty-hint">Carregando guarnições militares...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-aba 2: Movimentos em Trânsito -->
+                <div class="subtab-pane" id="subtab-military-movements">
+                    <div class="card">
+                        <div class="card-header-actions">
+                            <h3>Movimentos de Tropas e Frotas</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-refresh-movements">Atualizar Movimentos</button>
+                        </div>
+                        <div id="military-movements-container">
+                            <p class="empty-hint">Nenhum movimento registrado no momento.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-aba 3: Recrutamento -->
+                <div class="subtab-pane" id="subtab-military-train">
+                    <div class="card form-card military-recruit-card">
+                        <!-- HEADER DO RECRUTAMENTO COM STATUS DE CIDADES E INSTALAÇÕES -->
+                        <div class="recruit-header-bar">
+                            <div class="recruit-header-title">
+                                <h3>🪖 Recrutamento de Forças e Frotas de Guerra</h3>
+                                <p class="card-subtitle">Selecione uma unidade no catálogo tático para recrutar diretamente na guarnição da cidade.</p>
+                            </div>
+                            <div class="recruit-city-status-box">
+                                <div class="recruit-city-selector-wrap">
+                                    <label for="select-train-city" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Destino:</label>
+                                    <select id="select-train-city" class="form-control select-sm"></select>
+                                </div>
+                                <div class="recruit-status-chips">
+                                    <span class="status-chip" id="chip-barracks-status">🛡️ Quartel: consultando...</span>
+                                    <span class="status-chip" id="chip-shipyard-status">⚓ Estaleiro: consultando...</span>
+                                    <span class="status-chip highlight" id="chip-citizens-status">👥 Cidadãos: --</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SELETOR DE CATEGORIA (TROPAS vs NAVIOS) -->
+                        <div class="recruit-category-pills" id="recruit-cat-toggle">
+                            <button type="button" class="recruit-cat-btn active" data-cat="barracks">
+                                🗡️ Tropas Terrestres (Quartel)
+                            </button>
+                            <button type="button" class="recruit-cat-btn" data-cat="shipyard">
+                                ⚓ Navios de Guerra (Estaleiro)
+                            </button>
+                        </div>
+
+                        <!-- LAYOUT PRINCIPAL: CATÁLOGO DE CARDS + DOCK DE AÇÃO -->
+                        <div class="recruit-main-layout">
+                            <!-- CATÁLOGO DE UNIDADES EM CARDS -->
+                            <div class="recruit-units-grid" id="recruit-units-container">
+                                <!-- Cards gerados dinamicamente via JS -->
+                            </div>
+
+                            <!-- DOCK DE CONFIGURAÇÃO DA ORDEM -->
+                            <div class="recruit-action-dock" id="recruit-action-dock">
+                                <div class="dock-header">
+                                    <span class="dock-badge-tag">Ordem Militar</span>
+                                    <h4 id="dock-unit-name">Selecione uma Unidade</h4>
+                                    <p id="dock-unit-role" class="dock-unit-desc">Clique em qualquer unidade militar no catálogo para ajustar a ordem.</p>
+                                </div>
+
+                                <div class="dock-body">
+                                    <div class="dock-garrison-info" id="dock-garrison-row" style="display: none;">
+                                        <span>Guarnição atual na cidade:</span>
+                                        <b id="dock-garrison-val">0 unidades</b>
+                                    </div>
+
+                                    <div class="dock-qty-section">
+                                        <label for="input-train-amount" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
+                                            Quantidade a recrutar:
+                                        </label>
+                                        <div class="dock-stepper-wrap">
+                                            <button type="button" class="btn-stepper btn-stepper-sub" id="btn-qty-minus">-</button>
+                                            <input type="number" id="input-train-amount" class="form-control dock-qty-input" min="1" max="5000" value="10">
+                                            <button type="button" class="btn-stepper btn-stepper-add" id="btn-qty-plus">+</button>
+                                        </div>
+                                        <div class="dock-presets">
+                                            <button type="button" class="btn-preset-chip" data-amt="5">+5</button>
+                                            <button type="button" class="btn-preset-chip" data-amt="10">+10</button>
+                                            <button type="button" class="btn-preset-chip" data-amt="25">+25</button>
+                                            <button type="button" class="btn-preset-chip" data-amt="50">+50</button>
+                                            <button type="button" class="btn-preset-chip" data-amt="100">+100</button>
+                                            <button type="button" class="btn-preset-chip" id="btn-preset-max" title="Usar cidadãos livres disponíveis">Máx</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="dock-footer">
+                                    <button type="button" class="btn btn-primary btn-recruit-submit" id="btn-submit-train" disabled>
+                                        🪖 Selecione uma Unidade
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-aba 4: Deslocamento -->
+                <div class="subtab-pane" id="subtab-military-station">
+                    <div class="card form-card">
+                        <h3>Deslocar Tropas e Frotas</h3>
+                        <p class="card-subtitle">Transfira contingentes militares entre suas cidades ou bases aliadas.</p>
+                        <form id="form-station-military" onsubmit="return false;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="select-station-origin">Cidade de Origem</label>
+                                    <select id="select-station-origin" class="form-control"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="select-station-destination">Cidade de Destino</label>
+                                    <select id="select-station-destination" class="form-control"></select>
+                                </div>
+                            </div>
+                            <div id="station-units-inputs" class="station-units-grid">
+                                <p class="empty-hint">Selecione uma cidade de origem para carregar as unidades disponíveis.</p>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-submit-station" style="margin-top: 15px;">Enviar Deslocamento</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 8: MERCADO & ENTREPOSTO -->
+            <section class="tab-content" id="tab-market">
+                <div class="section-header">
+                    <h2>Mercado & Entreposto Comercial</h2>
+                    <p class="section-desc">Consulte ofertas de compra e venda nas redondezas, adquira recursos vantajosos e publique mercadorias.</p>
+                </div>
+
+                <div class="subnav-pills">
+                    <button class="subnav-pill active" data-subtab="subtab-market-buy">Comprar Mercadorias</button>
+                    <button class="subnav-pill" data-subtab="subtab-market-sell">Publicar Ofertas de Venda</button>
+                </div>
+
+                <!-- Sub-aba Comprar -->
+                <div class="subtab-pane active" id="subtab-market-buy">
+                    <div class="card">
+                        <div class="filter-bar">
+                            <div class="form-group">
+                                <label for="select-market-buy-city">Cidade Compradora</label>
+                                <select id="select-market-buy-city" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="select-market-buy-resource">Recurso</label>
+                                <select id="select-market-buy-resource" class="form-control">
+                                    <option value="wood">Madeira</option>
+                                    <option value="wine">Vinho</option>
+                                    <option value="marble">Mármore</option>
+                                    <option value="crystal">Cristal</option>
+                                    <option value="sulfur">Enxofre</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="select-market-buy-radius">Raio Máximo</label>
+                                <select id="select-market-buy-radius" class="form-control">
+                                    <option value="0">Mesma Ilha</option>
+                                    <option value="1">1 Ilha de Distância</option>
+                                    <option value="2">2 Ilhas de Distância</option>
+                                    <option value="3">3 Ilhas de Distância</option>
+                                    <option value="5" selected>5 Ilhas de Distância</option>
+                                    <option value="10">10 Ilhas de Distância</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="align-self: flex-end;">
+                                <button class="btn btn-primary" id="btn-search-offers">Buscar Ofertas</button>
+                            </div>
+                        </div>
+
+                        <div id="market-offers-container" style="margin-top: 15px;">
+                            <p class="empty-hint">Selecione os parâmetros e clique em "Buscar Ofertas".</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-aba Vender -->
+                <div class="subtab-pane" id="subtab-market-sell">
+                    <div class="card form-card">
+                        <h3>Criar Oferta de Venda</h3>
+                        <p class="card-subtitle">Coloque mercadorias à venda no entreposto da cidade selecionada.</p>
+                        <form id="form-market-sell" onsubmit="return false;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="select-market-sell-city">Cidade do Entreposto</label>
+                                    <select id="select-market-sell-city" class="form-control"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="select-market-sell-resource">Recurso a Vender</label>
+                                    <select id="select-market-sell-resource" class="form-control">
+                                        <option value="wood">Madeira</option>
+                                        <option value="wine">Vinho</option>
+                                        <option value="marble">Mármore</option>
+                                        <option value="crystal">Cristal</option>
+                                        <option value="sulfur">Enxofre</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="input-market-sell-amount">Quantidade</label>
+                                    <input type="number" id="input-market-sell-amount" class="form-control" min="1" max="100000" value="5000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input-market-sell-price">Preço Unitário (Ouro)</label>
+                                    <input type="number" id="input-market-sell-price" class="form-control" min="1" max="99" value="10">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-submit-sell">Publicar Oferta</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 9: LOGÍSTICA AVANÇADA -->
+            <section class="tab-content" id="tab-logistics">
+                <div class="section-header">
+                    <h2>Logística Avançada & Balanceamento</h2>
+                    <p class="section-desc">Automatize a distribuição harmônica de matérias-primas entre cidades ou concentre todos os excedentes em uma metrópole.</p>
+                </div>
+
+                <div class="subnav-pills">
+                    <button class="subnav-pill active" data-subtab="subtab-logistics-distribute">Distribuição Equilibrada</button>
+                    <button class="subnav-pill" data-subtab="subtab-logistics-consolidate">Consolidação de Recursos</button>
+                </div>
+
+                <!-- Sub-aba Distribuição -->
+                <div class="subtab-pane active" id="subtab-logistics-distribute">
+                    <div class="card form-card">
+                        <h3>Distribuição Equilibrada de Recursos</h3>
+                        <p class="card-subtitle">O bot calcula a soma do recurso escolhido nas cidades marcadas e distribui cotas iguais para que nenhuma fique desabastecida.</p>
+                        <form id="form-logistics-distribute" onsubmit="return false;">
+                            <div class="form-group" style="max-width: 320px; margin-bottom: 20px;">
+                                <label for="select-distribute-resource">Recurso a Distribuir</label>
+                                <select id="select-distribute-resource" class="form-control">
+                                    <option value="wood">Madeira</option>
+                                    <option value="wine">Vinho</option>
+                                    <option value="marble">Mármore</option>
+                                    <option value="crystal">Cristal</option>
+                                    <option value="sulfur">Enxofre</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Cidades Participantes</label>
+                                <div id="logistics-distribute-cities" class="checkbox-cities-grid">
+                                    <p class="empty-hint">Carregando cidades...</p>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-submit-distribute" style="margin-top: 15px;">Iniciar Distribuição Equilibrada</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Sub-aba Consolidação -->
+                <div class="subtab-pane" id="subtab-logistics-consolidate">
+                    <div class="card form-card">
+                        <h3>Consolidação de Recursos</h3>
+                        <p class="card-subtitle">Transporta os recursos das cidades de origem selecionadas para uma cidade destino centralizadora.</p>
+                        <form id="form-logistics-consolidate" onsubmit="return false;">
+                            <div class="form-group" style="max-width: 360px; margin-bottom: 20px;">
+                                <label for="select-consolidate-target">Cidade de Destino (Recebedora)</label>
+                                <select id="select-consolidate-target" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Cidades de Origem (Remetentes)</label>
+                                <div id="logistics-consolidate-cities" class="checkbox-cities-grid">
+                                    <p class="empty-hint">Carregando cidades...</p>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label>Recursos a Consolidar</label>
+                                <div class="checkbox-resources-row">
+                                    <label class="checkbox-label"><input type="checkbox" name="consolidate-res" value="wood" checked> Madeira</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="consolidate-res" value="wine" checked> Vinho</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="consolidate-res" value="marble" checked> Mármore</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="consolidate-res" value="crystal" checked> Cristal</label>
+                                    <label class="checkbox-label"><input type="checkbox" name="consolidate-res" value="sulfur" checked> Enxofre</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-submit-consolidate" style="margin-top: 15px;">Iniciar Consolidação</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 10: TEMPLO & MILAGRES -->
+            <section class="tab-content" id="tab-miracles">
+                <div class="section-header">
+                    <h2>Templo, Milagres & Santuário do Olimpo</h2>
+                    <p class="section-desc">Monitore os milagres divinos disponíveis nas suas ilhas e ative os poderes sagrados no momento ideal.</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header-actions">
+                        <h3>Milagres das Ilhas</h3>
+                        <button class="btn btn-secondary btn-sm" id="btn-refresh-miracles">Atualizar Milagres</button>
+                    </div>
+                    <div id="miracles-grid" class="miracles-grid">
+                        <p class="empty-hint">Carregando milagres divinos...</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-actions">
+                        <div>
+                            <h3>Santuário dos Deuses (Olimpo)</h3>
+                            <p class="card-subtitle">Consagre sacerdotes para conceder bênçãos ao seu império.</p>
+                        </div>
+                        <button class="btn btn-primary" id="btn-activate-shrine">Ativar Bênção do Santuário</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 11: MUNDO & EXPANSÃO -->
+            <section class="tab-content" id="tab-world">
+                <div class="section-header">
+                    <h2>Mundo, Ilhas & Vagas de Colonização</h2>
+                    <p class="section-desc">Vigie continuamente vagas livres para fundar novas colônias e mapeie arquipélagos do servidor.</p>
+                </div>
+
+                <div class="grid-2col">
+                    <div class="card form-card">
+                        <h3>Monitorar Vagas de Colonização</h3>
+                        <p class="card-subtitle">O bot verificará as ilhas indicadas periodicamente e emitirá um alerta imediato quando um lote for desocupado.</p>
+                        <form id="form-island-spaces" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="input-island-coords">Coordenadas das Ilhas ou IDs</label>
+                                <input type="text" id="input-island-coords" class="form-control" placeholder="Ex: 45:32, 46:32 ou 1205, 1206">
+                                <small class="field-hint">Separe múltiplos alvos por vírgula.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="input-island-interval">Intervalo de Verificação (Minutos)</label>
+                                <input type="number" id="input-island-interval" class="form-control" min="5" max="120" value="10">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-start-island-spaces">Iniciar Monitoramento</button>
+                        </form>
+                    </div>
+
+                    <div class="card form-card">
+                        <h3>Mapear Arquipélago (Dump World)</h3>
+                        <p class="card-subtitle">Varra coordenadas ao redor de uma ilha para catalogar cidades ativas e inativos.</p>
+                        <form id="form-dump-world" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="input-dump-center">Coordenada Central</label>
+                                <input type="text" id="input-dump-center" class="form-control" placeholder="Ex: 50:50">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-dump-radius">Raio de Varredura (Ilhas)</label>
+                                <input type="number" id="input-dump-radius" class="form-control" min="1" max="15" value="5">
+                            </div>
+                            <button type="submit" class="btn btn-secondary" id="btn-start-dump-world">Mapear Região</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 12: CONFIGURAÇÕES & SISTEMA -->
+            <section class="tab-content" id="tab-settings">
+                <div class="section-header">
+                    <h2>Configurações do Sistema & Rotinas</h2>
+                    <p class="section-desc">Configure integrações com Discord/Telegram, proxies de conexão, rotinas automáticas de login e modo de férias.</p>
+                </div>
+
+                <div class="grid-2col">
+                    <!-- Rotinas de Conta -->
+                    <div class="card form-card">
+                        <h3>Rotinas & Modo de Férias</h3>
+                        <div style="margin-bottom: 25px;">
+                            <h4>Coleta Diária de Recompensas</h4>
+                            <p class="card-subtitle">Coleta bônus de login diário, recompensas de cineteatro e favor dos deuses de uma só vez.</p>
+                            <button class="btn btn-success" id="btn-claim-daily">Coletar Recompensas Agora</button>
+                        </div>
+                        <div class="vacation-box">
+                            <h4 style="color: var(--danger-color);">Modo de Férias</h4>
+                            <p class="card-subtitle">Coloca sua conta em repouso absoluto. Atenção: a conta permanecerá inacessível por no mínimo 48 horas.</p>
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label for="input-vacation-password">Confirme sua Senha do Ikariam</label>
+                                <input type="password" id="input-vacation-password" class="form-control" placeholder="Sua senha">
+                            </div>
+                            <button class="btn btn-danger" id="btn-confirm-vacation">Ativar Modo de Férias</button>
+                        </div>
+                    </div>
+
+                    <!-- Notificações Externas -->
+                    <div class="card form-card">
+                        <h3>Notificações (Telegram & Discord)</h3>
+                        <p class="card-subtitle">Receba alertas em tempo real sobre ataques, lotes livres ou término de construções.</p>
+                        <form id="form-settings-notifications" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="input-telegram-token">Token do Bot Telegram</label>
+                                <input type="text" id="input-telegram-token" class="form-control" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-telegram-chatid">Chat ID do Telegram</label>
+                                <input type="text" id="input-telegram-chatid" class="form-control" placeholder="987654321">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-discord-webhook">Webhook URL do Discord</label>
+                                <input type="text" id="input-discord-webhook" class="form-control" placeholder="https://discord.com/api/webhooks/...">
+                            </div>
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button type="submit" class="btn btn-primary" id="btn-save-notifications">Salvar Notificações</button>
+                                <button type="button" class="btn btn-secondary" id="btn-test-notifications">Testar Envio</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Configurações de Proxy -->
+                    <div class="card form-card">
+                        <h3>Proxy de Rede</h3>
+                        <p class="card-subtitle">Rotacione ou oculte seu IP conectando-se por meio de um proxy HTTP ou SOCKS5.</p>
+                        <form id="form-settings-proxy" onsubmit="return false;">
+                            <div class="form-group">
+                                <label class="checkbox-label" style="margin-bottom: 10px;">
+                                    <input type="checkbox" id="chk-proxy-enable"> Habilitar Uso de Proxy
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="input-proxy-url">Endereço do Proxy</label>
+                                <input type="text" id="input-proxy-url" class="form-control" placeholder="socks5://user:pass@ip:porta ou http://ip:porta">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-save-proxy" style="margin-top: 15px;">Salvar Proxy</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+        </div> <!-- .dashboard-body -->
+
+        <!-- MODAL DE LOGIN E SELEÇÃO DE MUNDO -->
+        <div class="modal-overlay hidden" id="login-modal-overlay">
+            <div class="modal-card login-modal">
+                <div class="modal-header">
+                    <div class="modal-title-box">
+                        <div class="modal-logo">🏛️</div>
+                        <div>
+                            <h2>Conectar ao Ikariam</h2>
+                            <p class="modal-subtitle">Acesse sua conta Gameforge para gerenciar suas cidades e automações</p>
+                        </div>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-login" title="Fechar">&times;</button>
+                </div>
+
+                <!-- ALERTA DE STATUS / ERRO -->
+                <div class="auth-alert hidden" id="auth-alert"></div>
+
+                <!-- ETAPA 1: CREDENCIAIS -->
+                <div class="auth-step" id="auth-step-credentials">
+                    <!-- CONTAS SALVAS DETECTADAS -->
+                    <div class="saved-accounts-container hidden" id="saved-accounts-section">
+                        <label class="form-label">💾 Contas Salvas no Computador:</label>
+                        <div class="saved-accounts-list" id="saved-accounts-list"></div>
+                        <div class="divider-text"><span>ou conecte com outro e-mail</span></div>
+                    </div>
+
+                    <form id="form-login">
+                        <div class="form-row-grid">
+                            <div class="form-group">
+                                <label for="login-email">✉️ E-mail da Conta Gameforge:</label>
+                                <input type="email" id="login-email" class="form-control" placeholder="exemplo@email.com" required autocomplete="username">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="login-password">
+                                    <span>🔑 Senha:</span>
+                                    <span class="label-hint">(opcional se for conta salva)</span>
+                                </label>
+                                <input type="password" id="login-password" class="form-control" placeholder="Sua senha da Gameforge" autocomplete="current-password">
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-submit-lobby">
+                                <span class="btn-icon">🚀</span>
+                                <span class="btn-text">Buscar Mundos e Conectar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ETAPA 2: SELEÇÃO DE SERVIDOR / MUNDO -->
+                <div class="auth-step hidden" id="auth-step-servers">
+                    <div class="server-selection-header">
+                        <h3>🌍 Escolha seu Mundo / Servidor</h3>
+                        <p class="server-selection-desc">Selecione em qual dos seus mundos você deseja entrar agora:</p>
+                    </div>
+
+                    <div class="servers-grid" id="servers-grid">
+                        <!-- Cards de mundos renderizados via JS -->
+                    </div>
+
+                    <div class="server-actions">
+                        <button type="button" class="btn btn-ghost" id="btn-back-to-login">
+                            ⬅️ Voltar / Usar outro e-mail
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ESTADO DE CARREGAMENTO -->
+                <div class="auth-loading hidden" id="auth-loading">
+                    <div class="spinner-lg"></div>
+                    <p class="auth-loading-text" id="auth-loading-text">Conectando ao Gameforge Lobby...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELA DE CARREGAMENTO GLOBAL AO ENTRAR NO MUNDO -->
+        <div class="global-loading-overlay hidden" id="global-loading-screen">
+            <div class="global-loading-content">
+                <div class="loading-emblem-pulse">
+                    <span class="loading-icon-main">🏛️</span>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring delay"></div>
+                </div>
+                <h2 id="global-loading-title">Entrando no Mundo...</h2>
+                <p id="global-loading-subtitle" class="global-loading-subtitle">Carregando seu império e sincronizando cidades</p>
+                
+                <div class="loading-progress-container">
+                    <div class="loading-progress-bar" id="global-loading-bar"></div>
+                </div>
+                
+                <div class="loading-steps-list">
+                    <div class="loading-step-item active" id="step-auth">
+                        <span class="step-dot"></span>
+                        <span class="step-label">Conexão e autenticação Gameforge</span>
+                    </div>
+                    <div class="loading-step-item" id="step-session">
+                        <span class="step-dot"></span>
+                        <span class="step-label">Sincronização da sessão do mundo de jogo</span>
+                    </div>
+                    <div class="loading-step-item" id="step-cities">
+                        <span class="step-dot"></span>
+                        <span class="step-label">Carregamento de cidades, recursos e produções</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOASTS DE NOTIFICAÇÃO -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script src="/static/js/app.js?v=8"></script>
+</body>
+</html>

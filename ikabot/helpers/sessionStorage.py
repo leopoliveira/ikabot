@@ -7,12 +7,25 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 
 from ikabot import config
 from ikabot.helpers.aesCipher import AESCipher
 
 logger = logging.getLogger(__name__)
+
+_write_lock_mutex = threading.Lock()
+_file_locks = {}
+
+
+def _get_file_lock(filepath):
+    """Returns a reentrant lock dedicated to the specified file path."""
+    norm_path = os.path.normpath(os.path.abspath(filepath))
+    with _write_lock_mutex:
+        if norm_path not in _file_locks:
+            _file_locks[norm_path] = threading.RLock()
+        return _file_locks[norm_path]
 
 
 def get_home_dir():
@@ -207,37 +220,64 @@ def write_json_file(filepath, data):
     """
     Atomically writes data to disk as human-readable JSON (indent=2)
     using a temporary file and atomic replace to prevent corruptions.
+    Thread-safe and resilient against concurrent writes.
     """
     dir_path = os.path.dirname(filepath)
     if dir_path:
         os.makedirs(dir_path, exist_ok=True)
 
-    tmp_path = f"{filepath}.tmp.{os.getpid()}"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
+    with _get_file_lock(filepath):
+        tmp_path = f"{filepath}.tmp.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
 
-        # os.replace() can raise PermissionError on Windows if another
-        # ikabot process has filepath open at the same instant; retry briefly.
-        for attempt in range(5):
-            try:
-                os.replace(tmp_path, filepath)
-                break
-            except PermissionError:
-                if attempt < 4:
-                    time.sleep(0.05 * (attempt + 1))
-                    continue
-                raise
+            # os.replace() can raise PermissionError or OSError on Windows if another
+            # process has filepath open at the same instant; retry briefly.
+            for attempt in range(10):
+                try:
+                    os.replace(tmp_path, filepath)
+                    break
+                except (PermissionError, OSError):
+                    if attempt < 9:
+                        time.sleep(0.05 * (attempt + 1))
+                        continue
+                    raise
+        except Exception as e:
+            logger.error(f"Failed to write JSON to {filepath}: {e}")
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+            raise
+
+
+def get_last_account_path():
+    """Returns the path to ~/.ikabot/last_account.json."""
+    return os.path.join(get_ikabot_dir(), "last_account.json")
+
+
+def save_last_account(email, server_index, world_name=None, player_name=None):
+    """Saves the last logged account email, server index and world for auto-login."""
+    try:
+        data = {
+            "email": email,
+            "server_index": int(server_index),
+            "world": world_name or "",
+            "player": player_name or "",
+            "updated_at": time.time(),
+        }
+        write_json_file(get_last_account_path(), data)
     except Exception as e:
-        logger.error(f"Failed to write JSON to {filepath}: {e}")
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
-        raise
+        logger.warning(f"Error saving last account: {e}")
+
+
+def get_last_account():
+    """Returns the last logged account info dictionary or None."""
+    return read_json_file(get_last_account_path(), default=None)
 
 
 def migrate_legacy_account(session_or_mail, password, custom_logger=None):

@@ -10,6 +10,7 @@ import os
 import random
 import re
 import sys
+import threading
 import time
 import traceback
 import urllib.parse
@@ -40,14 +41,23 @@ from ikabot.helpers.apiComm import getNewBlackBoxToken
 from ikabot.helpers.lobbyDecaptcha import break_interactive_captcha
 
 
+_session_network_lock = threading.RLock()
+
+
 class Session:
-    def __init__(self):
+    def __init__(self, mail=None, password=None, account_index=None, auto_login=True, interactive=True):
         self.padre = True
         self.logged = False
         self.blackbox = None
         self.api_user_agent = None
-        self.mail = None
-        self.password = None
+        self.mail = mail
+        self.password = password
+        self.account_index = account_index
+        self.interactive = interactive
+        self.available_accounts = []
+        self.unblocked_accounts = []
+        self.accounts = []
+        self.servers = []
         self.locale = config.IKABOT_LOCALE
         self.gf_lang = config.IKABOT_GF_LANG
         self.accept_language = config.build_accept_language(self.locale, self.gf_lang)
@@ -56,7 +66,8 @@ class Session:
         self.requestHistory = deque(maxlen=5)  # keep last 5 requests in history
         # disable ssl verification warning
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-        self.__login()
+        if auto_login:
+            self.__login()
 
     def setStatus(self, message):
         """This function will modify the current tasks status message that appears in the table on the main menu
@@ -363,12 +374,15 @@ class Session:
         need the real credentials to re-authenticate via mauth. Ask for them
         only in that moment, and only in the parent process.
         """
-        if not self.password and self.padre:
-            if not self.mail:
-                print("\nThe stored session has expired and no account mail was provided.")
-                self.mail = read(msg="Mail: ")
-            print("\nThe stored session has expired. Enter the password for '{}':".format(self.mail))
-            self.password = getpass.getpass("Password: ")
+        if not self.password:
+            if not getattr(self, "interactive", True):
+                raise ValueError(f"Sessão expirada para '{self.mail}'. Digite a senha para autenticar.")
+            if self.padre:
+                if not self.mail:
+                    print("\nThe stored session has expired and no account mail was provided.")
+                    self.mail = read(msg="Mail: ")
+                print("\nThe stored session has expired. Enter the password for '{}':".format(self.mail))
+                self.password = getpass.getpass("Password: ")
 
     def __load_new_blackbox_token(self, allow_lobby_cookie_fallback=False):
         try:
@@ -390,6 +404,8 @@ class Session:
             return True
         except Exception as e:
             self.logger.error("Failed to obtain new blackbox token from API: ", exc_info=True)
+            if not getattr(self, "interactive", True):
+                raise Exception(f"Falha ao gerar token de autenticação Gameforge (blackbox): {str(e)}")
             if not self.padre: # only exit if running in a child process because user won't be looking at the console to provide the cookies
                 sys.exit('Failed to regenerate blackbox token')
             print(f'{bcolors.RED}[ERROR]{bcolors.ENDC} Failed to obtain new blackbox token from API: ' + str(e)) # using expired fallback token here so that user can insert cookie manually since blackbox generation failed at this point
@@ -408,65 +424,32 @@ class Session:
                 return False
             sys.exit('Manual blackbox payload was empty')
 
-    def __login(self, retries=0):
-        if not self.logged:
-            banner()
+    def fetch_lobby(self, mail=None, password=None):
+        """Autentica no Lobby Gameforge e recupera as contas e servidores disponíveis."""
+        if mail:
+            self.mail = mail
+        if password is not None:
+            self.password = password
 
-            self.mail = read(msg="Mail:")
-            entered_mail = self.mail
+        if not self.mail:
+            raise ValueError("E-mail não fornecido.")
 
-            if not entered_mail:
-                # No mail provided (Enter/Enter). Never ask for a password:
-                # use the stored cookies from default_user.json, or if that
-                # does not exist but other accounts are saved, let the user
-                # pick one so its cookies are reused.
-                default_user_file = get_user_file_path("")
-                saved_users = get_saved_users()
-                if saved_users and not os.path.exists(default_user_file):
-                    if len(saved_users) == 1:
-                        selected = saved_users[0]
-                        print("\nNo default account found, using saved account: {}".format(selected))
-                    else:
-                        print("\nNo default account found. Select a saved account:")
-                        for i, user in enumerate(saved_users, start=1):
-                            print("  {}. {}".format(i, user))
-                        selected = saved_users[read(min=1, max=len(saved_users), digit=True) - 1]
-                    self.mail = selected
-                # Cookies are already stored, skip password prompt (unless we
-                # already learned the password during a previous retry)
-                if not self.password:
-                    self.password = ""
-            else:
-                # Mail was typed. If it matches a saved account, reuse its cookies
-                # instead of asking for a password.
-                matching_path, has_duplicates = find_user_file_for_email(entered_mail)
-                if matching_path:
-                    if has_duplicates:
-                        print("\n[Warning] '{}' is present in multiple session files. Using the most recently modified one.".format(entered_mail))
-                    self.password = ""
-                else:
-                    # No saved session for this mail
-                    print("\nNo saved session found for '{}'.".format(entered_mail))
-                    print("Check the files in: {}".format(get_users_dir()))
-                    print("If they are outdated or corrupted, delete them and log in manually.")
-                    if len(config.predetermined_input) != 0:
-                        self.password = config.predetermined_input.pop(0)
-                    else:
-                        self.password = getpass.getpass("Password:")
+        if self.password is None:
+            matching_path, _ = find_user_file_for_email(self.mail)
+            if matching_path:
+                self.password = ""
 
-            banner()
-
-        #choose one user agent from user_agents list based on provided mail
+        # choose one user agent from user_agents list based on provided mail
         selected_user_agent = user_agents[sum(ord(c) for c in self.mail) % len(user_agents)]
         self.api_user_agent = selected_user_agent
         self.user_agent = selected_user_agent
 
         self.s = requests.Session()
-        self.cipher = AESCipher(self.mail, self.password)
-        migrate_legacy_account(self.mail, self.password, self.logger)
-        self.logger.info("__login()")
+        self.cipher = AESCipher(self.mail, self.password or "")
+        migrate_legacy_account(self.mail, self.password or "", self.logger)
+        self.logger.info("fetch_lobby()")
 
-        # test to see if the lobby cookie in the session file is valid, this will save time on login and will reduce use of blackbox token
+        # test to see if the lobby cookie in the session file is valid
         sessionData = self.getSessionData()
         if "shared" in sessionData and "lobby" in sessionData["shared"]:
             cookie_obj = requests.cookies.create_cookie(
@@ -477,14 +460,12 @@ class Session:
             self.s.cookies.set_cookie(cookie_obj)
 
         if not self.__test_lobby_cookie():
-
             self.logger.warning("Getting new lobby cookie")
             self.__ask_password_if_needed()
-            blackbox_loaded = self.__load_new_blackbox_token(allow_lobby_cookie_fallback=True)
+            blackbox_loaded = self.__load_new_blackbox_token(allow_lobby_cookie_fallback=getattr(self, "interactive", True))
             if not blackbox_loaded:
-                auth_token = self.s.cookies["gf-token-production"]
+                auth_token = self.s.cookies.get("gf-token-production")
             else:
-
                 # get gameEnvironmentId and platformGameId
                 self.headers = {
                     "Host": "lobby.ikariam.gameforge.com",
@@ -505,10 +486,14 @@ class Session:
                 js = r.text
                 gameEnvironmentId = re.search(r'"gameEnvironmentId":"(.*?)"', js)
                 if gameEnvironmentId is None:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("gameEnvironmentId não encontrado no Gameforge Lobby.")
                     sys.exit("gameEnvironmentId not found")
                 gameEnvironmentId = gameEnvironmentId.group(1)
                 platformGameId = re.search(r'"platformGameId":"(.*?)"', js)
                 if platformGameId is None:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("platformGameId não encontrado no Gameforge Lobby.")
                     sys.exit("platformGameId not found")
                 platformGameId = platformGameId.group(1)
 
@@ -528,6 +513,8 @@ class Session:
                 html = r.text
                 captcha = re.search(r"Attention Required", html)
                 if captcha is not None:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Erro de Captcha no Gameforge.")
                     sys.exit("Captcha error!")
 
                 # update __cfduid cookie
@@ -613,7 +600,7 @@ class Session:
                         "https://pixelzirkus.gameforge.com/do/simple", data=data
                     )
                 except Exception:
-                    pass  # These cookies are not required and sometimes cause issues for people logging in
+                    pass
 
                 # options req (not really needed)
                 self.headers = {
@@ -667,6 +654,8 @@ class Session:
 
                 # MFA / 2FA Check. If the server responds with 409, it means 2FA is required.
                 if r.status_code == 409 and 'OTP_REQUIRED' in r.text:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Autenticação em duas etapas (2FA) necessária na conta.")
                     if self.padre:
                         print("Two-factor authentication (2FA) is required.")
                         mfa_code = read(msg="Enter your 2FA code: ")
@@ -674,15 +663,14 @@ class Session:
                         self.logger.error("2FA is required, but it cannot be requested in a child process.")
                         sys.exit("Login failure: 2FA is required in a non-interactive process.")
 
-                    # Add the OTP code to the original data and send the request again
-                    # to the same endpoint.
                     data['otpCode'] = mfa_code
-
                     r = self.s.post(
                         "https://spark-web.gameforge.com/api/v2/authProviders/mauth/sessions", json=data
                     )
 
                 if "gf-challenge-id" in r.headers and 'token' not in r.text:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Desafio de Captcha interativo Gameforge detectado.")
                     while True:
                         self.headers = {
                             "Accept": "*/*",
@@ -777,7 +765,7 @@ class Session:
                             print("Do you want to solve it via Telegram? (Y/n)")
                             config.predetermined_input[:] = (
                                 []
-                            )  # Unholy way to clear a ListProxy object
+                            )
                             answer = read(values=["y", "Y", "n", "N"], default="y")
                             if answer.lower() == "n":
                                 sys.exit("Captcha error! (Interactive)")
@@ -855,6 +843,8 @@ class Session:
                                 break
 
                 if 'token' not in r.text:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Falha na autenticação Gameforge. Verifique seu e-mail e senha.")
                     print("Failed to log in...")
                     print(f"Expected to get token in response to login request but instead got code {r.status_code} and body {r.text}")
                     print(
@@ -894,9 +884,10 @@ class Session:
                                 print(f"Expected to get token in response to login request but instead got code {r.status_code} and body {r.text}")
 
                 if 'token' not in r.text:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Token de autenticação não obtido. Verifique suas credenciais.")
                     auth_token = self.__ask_lobby_cookie()
                 else:
-                    # get the authentication token and set the cookie
                     ses_json = json.loads(r.text, strict=False)
                     auth_token = ses_json["token"]
                     cookie_obj = requests.cookies.create_cookie(
@@ -905,8 +896,6 @@ class Session:
                         value=auth_token,
                     )
                     self.s.cookies.set_cookie(cookie_obj)
-
-            # set the lobby cookie in shared for all world server accounts
 
             lobby_data = dict()
             lobby_data["lobby"] = dict()
@@ -949,67 +938,55 @@ class Session:
         r = self.s.get("https://lobby.ikariam.gameforge.com/api/servers")
         servers = json.loads(r.text, strict=False)
 
-        if not self.logged:
+        self.accounts = accounts
+        self.servers = servers
+        self.unblocked_accounts = []
+        for account in [acc for acc in accounts if acc.get("blocked") is False]:
+            account_group = account.get("accountGroup")
+            matching = [
+                srv for srv in servers if srv.get("accountGroup") == account_group
+            ]
+            world = matching[0]["name"] if matching else f"Mundo {account['server']['number']}"
+            server_lang = matching[0]["language"] if matching else account["server"]["language"]
+            try:
+                lastlogin = lastloginTimetoString(account["lastLogin"])
+            except Exception:
+                lastlogin = "Desconhecido"
 
-            if (
-                len([account for account in accounts if account["blocked"] is False])
-                == 1
-            ):
-                self.account = [
-                    account for account in accounts if account["blocked"] is False
-                ][0]
-            else:
-                print("With which account do you want to log in?\n")
+            self.unblocked_accounts.append({
+                "index": len(self.unblocked_accounts),
+                "id": account.get("id"),
+                "name": account.get("name"),
+                "world": world,
+                "server_lang": server_lang,
+                "number": account["server"]["number"],
+                "last_login": lastlogin,
+                "account_group": account_group,
+                "raw": account,
+            })
+        return self.unblocked_accounts
 
-                max_name = max(
-                    [
-                        len(account["name"])
-                        for account in accounts
-                        if account["blocked"] is False
-                    ]
-                )
-                i = 0
-                for account in [
-                    account for account in accounts if account["blocked"] is False
-                ]:
-                    server = account["server"]["language"]
-                    mundo = account["server"]["number"]
-                    account_group = account["accountGroup"]
-                    server_lang = None
-                    world, server_lang = [
-                        (srv["name"], srv["language"])
-                        for srv in servers
-                        if srv["accountGroup"] == account_group
-                    ][0]
-                    try: lastlogin =  lastloginTimetoString(account["lastLogin"])
-                    except: lastlogin = 'Unknown'
+    def complete_login(self, account_index=0, retries=0):
+        """Conecta ao servidor/mundo específico selecionado e adquire cookies da conta de jogo."""
+        if not self.unblocked_accounts:
+            raise ValueError("Nenhum servidor ou conta disponível para login.")
+        if account_index < 0 or account_index >= len(self.unblocked_accounts):
+            raise ValueError(f"Índice de conta inválido: {account_index}")
 
-                    i += 1
-                    pad = " " * (max_name - len(account["name"]))
-                    print(
-                        "({:d}) {}{} [{} - {} - {}]".format(
-                            i, account["name"], pad, lastlogin, server_lang, world
-                        )
-                    )
-                num = read(min=1, max=i)
-                self.account = [
-                    account for account in accounts if account["blocked"] is False
-                ][num - 1]
-            self.username = self.account["name"]
-            self.login_servidor = self.account["server"]["language"]
-            self.account_group = self.account["accountGroup"]
-            self.mundo = str(self.account["server"]["number"])
+        selected_account = self.unblocked_accounts[account_index]
+        self.account = selected_account["raw"]
+        self.username = self.account["name"]
+        self.login_servidor = self.account["server"]["language"]
+        self.account_group = self.account["accountGroup"]
+        self.mundo = str(self.account["server"]["number"])
+        self.word = selected_account["world"]
+        self.servidor = selected_account["server_lang"]
 
-            self.word, self.servidor = [
-                (srv["name"], srv["language"])
-                for srv in servers
-                if srv["accountGroup"] == self.account_group
-            ][0]
-
-            config.infoUser = "Server:{}".format(self.servidor)
-            config.infoUser += ", World:{}".format(self.word)
-            config.infoUser += ", Player:{}".format(self.username)
-            setLoggedInPlayer(self.username)
+        config.infoUser = "Server:{}".format(self.servidor)
+        config.infoUser += ", World:{}".format(self.word)
+        config.infoUser += ", Player:{}".format(self.username)
+        setLoggedInPlayer(self.username)
+        if getattr(self, "interactive", True):
             banner()
 
         self.host = "s{}-{}.ikariam.gameforge.com".format(self.mundo, self.servidor)
@@ -1035,23 +1012,22 @@ class Session:
         used_old_cookies = False
         # if there are cookies stored, try to use them
         if "cookies" in sessionData and self.logged is False:
-            # create a new temporary session object
             old_s = requests.Session()
-            # set the headers
             old_s.headers.clear()
             old_s.headers.update(self.headers)
-            # set the cookies to test
             cookie_dict = sessionData["cookies"]
             requests.cookies.cookiejar_from_dict(
                 cookie_dict, cookiejar=old_s.cookies, overwrite=True
             )
             self.__update_proxy(obj=old_s, sessionData=sessionData)
             try:
-                # make a request to check the connection
                 old_resp = old_s.get(self.urlBase, verify=config.do_ssl_verify)
                 html = old_resp.text
             except Exception:
-                self.__proxy_error()
+                if not getattr(self, "interactive", True):
+                    html = ""
+                else:
+                    self.__proxy_error()
 
             cookies_are_valid = self.__isExpired(html) is False
             # A valid-looking response that is actually the session-rotation
@@ -1068,13 +1044,10 @@ class Session:
             if cookies_are_valid:
                 self.logger.info("using old cookies")
                 used_old_cookies = True
-                # assign the old cookies to the session object
                 requests.cookies.cookiejar_from_dict(
                     cookie_dict, cookiejar=self.s.cookies, overwrite=True
                 )
-                # set the proxy
                 self.__update_proxy(sessionData=sessionData)
-                # set the headers
                 self.s.headers.clear()
                 self.s.headers.update(self.headers)
 
@@ -1111,8 +1084,8 @@ class Session:
             skipGetCookie = False
             if "url" not in respJson:
                 if retries > 0:
-                    return self.__login(retries - 1)
-                else:  # 403 is for bad user/pass and 400 is bad blackbox token?
+                    return self.complete_login(account_index, retries - 1)
+                else:
                     msg = (
                         "Login Error: "
                         + str(resp.status_code)
@@ -1127,6 +1100,8 @@ class Session:
                             "Manual browser cookie login is the recommended fallback."
                         )
                     self.logger.error(msg)
+                    if not getattr(self, "interactive", True):
+                        raise Exception(f"Falha ao obter link de login para o mundo: {msg}")
                     if self.padre:
                         print(msg)
                         print(
@@ -1161,7 +1136,6 @@ class Session:
                             )
                             self.s.cookies.set_cookie(cookie_obj)
                             try:
-                                # make a request to check the connection
                                 html = self.s.get(
                                     self.urlBase, verify=config.do_ssl_verify
                                 ).text
@@ -1178,7 +1152,6 @@ class Session:
                                 if choice in ["n", "N"]:
                                     sys.exit(msg)
                                 continue
-                            # TODO check if account is actually the one associated with this email / pass
                             break
                     else:
                         self.logger.error("I wanted to ask user for ikariam cookie, but he wasn't looking")
@@ -1190,6 +1163,8 @@ class Session:
                     r"https://s\d+-\w{2}\.ikariam\.gameforge\.com/index\.php\?", url
                 )
                 if match is None:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("URL de login inválida retornada pelo Gameforge.")
                     sys.exit("Error")
 
                 # set the headers
@@ -1203,10 +1178,14 @@ class Session:
                 try:
                     html = self.s.get(url, verify=config.do_ssl_verify).text
                 except Exception:
+                    if not getattr(self, "interactive", True):
+                        raise Exception("Erro de proxy ou conexão ao acessar a URL do jogo.")
                     self.__proxy_error()
 
         if self.__isInVacation(html):
             msg = "The account went into vacation mode"
+            if not getattr(self, "interactive", True):
+                raise Exception("A conta está em modo de férias.")
             if self.padre:
                 print(msg)
             else:
@@ -1214,7 +1193,9 @@ class Session:
             os._exit(0)
         if self.__isExpired(html):
             if retries > 0:
-                return self.__login(retries - 1)
+                return self.complete_login(account_index, retries - 1)
+            if not getattr(self, "interactive", True):
+                raise Exception("Sessão expirou durante a autenticação no mundo.")
             if self.padre:
                 msg = "Login error."
                 print(msg)
@@ -1233,31 +1214,112 @@ class Session:
         cookies = self.s.cookies.get_dict()
         self.dev_ikariam_cookie = cookies.get("ikariam")
         self.dev_gf_token = cookies.get("gf-token-production")
+        return True
+
+    def __login(self, retries=0):
+        """Método padrão de login interativo (CLI) ou reconexão."""
+        if not self.logged:
+            if getattr(self, "interactive", True) and not self.mail:
+                banner()
+                self.mail = read(msg="Mail:")
+                entered_mail = self.mail
+
+                if not entered_mail:
+                    default_user_file = get_user_file_path("")
+                    saved_users = get_saved_users()
+                    if saved_users and not os.path.exists(default_user_file):
+                        if len(saved_users) == 1:
+                            selected = saved_users[0]
+                            print("\nNo default account found, using saved account: {}".format(selected))
+                        else:
+                            print("\nNo default account found. Select a saved account:")
+                            for i, user in enumerate(saved_users, start=1):
+                                print("  {}. {}".format(i, user))
+                            selected = saved_users[read(min=1, max=len(saved_users), digit=True) - 1]
+                        self.mail = selected
+                    if not self.password:
+                        self.password = ""
+                else:
+                    matching_path, has_duplicates = find_user_file_for_email(entered_mail)
+                    if matching_path:
+                        if has_duplicates:
+                            print("\n[Warning] '{}' is present in multiple session files. Using the most recently modified one.".format(entered_mail))
+                        self.password = ""
+                    else:
+                        print("\nNo saved session found for '{}'.".format(entered_mail))
+                        print("Check the files in: {}".format(get_users_dir()))
+                        print("If they are outdated or corrupted, delete them and log in manually.")
+                        if len(config.predetermined_input) != 0:
+                            self.password = config.predetermined_input.pop(0)
+                        else:
+                            self.password = getpass.getpass("Password:")
+
+                banner()
+
+            self.fetch_lobby()
+
+            # Se a conta já havia sido selecionada anteriormente (ex: re-login após expirar)
+            if hasattr(self, "account") and self.account and self.unblocked_accounts:
+                target_id = self.account.get("id")
+                matching_indices = [
+                    a["index"] for a in self.unblocked_accounts if a.get("id") == target_id
+                ]
+                if matching_indices:
+                    return self.complete_login(matching_indices[0], retries=retries)
+
+            if len(self.unblocked_accounts) == 1:
+                self.complete_login(0, retries=retries)
+            elif len(self.unblocked_accounts) > 1:
+                if self.account_index is not None and 0 <= self.account_index < len(self.unblocked_accounts):
+                    self.complete_login(self.account_index, retries=retries)
+                elif getattr(self, "interactive", True):
+                    print("With which account do you want to log in?\n")
+                    max_name = max([len(a["name"]) for a in self.unblocked_accounts])
+                    for a in self.unblocked_accounts:
+                        pad = " " * (max_name - len(a["name"]))
+                        print("({:d}) {}{} [{} - {} - {}]".format(
+                            a["index"] + 1, a["name"], pad, a["last_login"], a["server_lang"], a["world"]
+                        ))
+                    num = read(min=1, max=len(self.unblocked_accounts))
+                    self.complete_login(num - 1, retries=retries)
+                else:
+                    raise ValueError("Múltiplos mundos disponíveis. Seleção necessária na interface web.")
 
     def __backoff(self):
         self.logger.info("__backoff()")
         if self.padre is False:
             time.sleep(5 * random.randint(0, 10))
 
-    def __sessionExpired(self):
+    def __sessionExpired(self, retries=2):
         self.logger.info("__sessionExpired()")
-        self.__backoff()
+        if retries <= 0:
+            self.logger.error("Falha ao recuperar sessão expirada após múltiplas tentativas.")
+            if not getattr(self, "interactive", True):
+                raise Exception("Sessão expirada no servidor do jogo.")
+            sys.exit(1)
 
+        self.__backoff()
         sessionData = self.getSessionData()
 
         try:
-            if self.s.cookies["PHPSESSID"] != sessionData["cookies"]["PHPSESSID"]:
+            stored_cookies = sessionData.get("cookies", {})
+            current_phpsessid = self.s.cookies.get("PHPSESSID")
+            stored_phpsessid = stored_cookies.get("PHPSESSID") if isinstance(stored_cookies, dict) else None
+
+            if current_phpsessid != stored_phpsessid and stored_phpsessid:
                 self.__getCookie(sessionData)
             else:
                 try:
-                    self.__login(3)
-                except Exception:
-                    self.__sessionExpired()
-        except KeyError:
+                    self.__login(retries)
+                except Exception as e:
+                    self.logger.warning(f"Tentativa de re-login falhou: {e}")
+                    self.__sessionExpired(retries - 1)
+        except Exception as e:
+            self.logger.warning(f"Erro ao verificar cookies de sessão: {e}")
             try:
-                self.__login(3)
+                self.__login(retries)
             except Exception:
-                self.__sessionExpired()
+                self.__sessionExpired(retries - 1)
 
     def __proxy_error(self):
         sessionData = self.getSessionData()
@@ -1352,39 +1414,42 @@ class Session:
         html : str
             response from the server
         """
-        self.__checkCookie()
-        self.__update_proxy()
-
         if noIndex:
             url = self.urlBase.replace("index.php", "") + url
         else:
             url = self.urlBase + url
         if noQuery:
             url = url.replace('?','')
-        while True:
+        attempts = 0
+        req_timeout = kwargs.pop("timeout", 45)
+        while attempts < 3:
+            attempts += 1
             try:
-                self.requestHistory.append(
-                    {
-                        "method": "GET",
-                        "url": url,
-                        "params": params,
-                        "payload": None,
-                        "proxies": self.s.proxies,
-                        "headers": dict(self.s.headers),
-                        "response": None,
+                with _session_network_lock:
+                    self.__checkCookie()
+                    self.__update_proxy()
+                    self.requestHistory.append(
+                        {
+                            "method": "GET",
+                            "url": url,
+                            "params": params,
+                            "payload": None,
+                            "proxies": self.s.proxies,
+                            "headers": dict(self.s.headers),
+                            "response": None,
+                        }
+                    )
+                    self.logger.debug(f"About to send: {str(self.requestHistory[-1])}")
+                    response = self.s.get(
+                        url, params=params, verify=config.do_ssl_verify, timeout=req_timeout, **kwargs
+                    )
+                    self.requestHistory[-1]["response"] = {
+                        "status": response.status_code,
+                        "elapsed": response.elapsed.total_seconds(),
+                        "headers": dict(response.headers),
+                        "text": response.text,
                     }
-                )
-                self.logger.debug(f"About to send: {str(self.requestHistory[-1])}")
-                response = self.s.get(
-                    url, params=params, verify=config.do_ssl_verify, timeout=300, **kwargs
-                )
-                self.requestHistory[-1]["response"] = {
-                    "status": response.status_code,
-                    "elapsed": response.elapsed.total_seconds(),
-                    "headers": dict(response.headers),
-                    "text": response.text,
-                }
-                html = response.text
+                    html = response.text
 
                 # modifica redirect 302
                 if response.status_code == 302:
@@ -1436,6 +1501,14 @@ class Session:
                 except Exception:
                     pass
 
+                # capture actionRequest token if present in HTML/response
+                new_token = re.search(r'actionRequest"?:\s*"(.*?)"', html)
+                if new_token:
+                    sessionData = self.getSessionData()
+                    sessionData.pop("shared", None)
+                    sessionData["actionRequestToken"] = new_token.group(1)
+                    self.setSessionData(sessionData)
+
                 if fullResponse:
                     return response
                 else:
@@ -1444,9 +1517,13 @@ class Session:
                 self.__sessionExpired()
             except requests.exceptions.ConnectionError:
                 self.logger.warning(f"Connection error occured, retrying in {ConnectionError_wait}s\n{str(params) + ' --> ' + url}")
+                if attempts >= 3:
+                    raise
                 time.sleep(ConnectionError_wait)
             except requests.exceptions.Timeout:
-                self.logger.warning(f"5 minute timeout occured on request, retrying in {ConnectionError_wait}s\n{str(params) + ' --> ' + url}")
+                self.logger.warning(f"Timeout occurred on GET request (tentativa {attempts}/3): {str(params) + ' --> ' + url}")
+                if attempts >= 3:
+                    raise
                 time.sleep(ConnectionError_wait)
 
     def post(
@@ -1474,8 +1551,6 @@ class Session:
         url_original = url
         payloadPost_original = payloadPost
         params_original = params
-        self.__checkCookie()
-        self.__update_proxy()
 
         # add the request id
         token = self.__token()
@@ -1491,35 +1566,41 @@ class Session:
             url = self.urlBase + url
         if noQuery:
             url = url.replace('?','')
-        while True:
+        attempts = 0
+        req_timeout = kwargs.pop("timeout", 45)
+        while attempts < 3:
+            attempts += 1
             try:
-                self.requestHistory.append(
-                    {
-                        "method": "POST",
-                        "url": url,
-                        "params": params,
-                        "payload": payloadPost,
-                        "proxies": self.s.proxies,
-                        "headers": dict(self.s.headers),
-                        "response": None,
+                with _session_network_lock:
+                    self.__checkCookie()
+                    self.__update_proxy()
+                    self.requestHistory.append(
+                        {
+                            "method": "POST",
+                            "url": url,
+                            "params": params,
+                            "payload": payloadPost,
+                            "proxies": self.s.proxies,
+                            "headers": dict(self.s.headers),
+                            "response": None,
+                        }
+                    )
+                    self.logger.debug(f"About to send: {str(self.requestHistory[-1])}")
+                    response = self.s.post(
+                        url,
+                        data=payloadPost,
+                        params=params,
+                        verify=config.do_ssl_verify,
+                        timeout=req_timeout,
+                        **kwargs,
+                    )
+                    self.requestHistory[-1]["response"] = {
+                        "status": response.status_code,
+                        "elapsed": response.elapsed.total_seconds(),
+                        "headers": dict(response.headers),
+                        "text": response.text,
                     }
-                )
-                self.logger.debug(f"About to send: {str(self.requestHistory[-1])}")
-                response = self.s.post(
-                    url,
-                    data=payloadPost,
-                    params=params,
-                    verify=config.do_ssl_verify,
-                    timeout=300,
-                    **kwargs,
-                )
-                self.requestHistory[-1]["response"] = {
-                    "status": response.status_code,
-                    "elapsed": response.elapsed.total_seconds(),
-                    "headers": dict(response.headers),
-                    "text": response.text,
-                }
-                resp = response.text
+                    resp = response.text
 
                 #  modifica redirect 302
                 if response.status_code == 302:
@@ -1560,11 +1641,16 @@ class Session:
                     self.__printSessionRotated()
                     sys.exit(1)
                 if "TXT_ERROR_WRONG_REQUEST_ID" in resp:
+                    retry_count = kwargs.get('_retry_count', 0)
+                    if retry_count >= 2:
+                        self.logger.warning("Limite de retentativas para TXT_ERROR_WRONG_REQUEST_ID atingido.")
+                        return resp if not fullResponse else response
                     self.logger.info("got TXT_ERROR_WRONG_REQUEST_ID, bad actionRequest")
                     sessionData = self.getSessionData()
                     if sessionData.pop("actionRequestToken", None) is not None:
                         sessionData.pop("shared", None)
                         self.setSessionData(sessionData)
+                    kwargs['_retry_count'] = retry_count + 1
                     return self.post(
                         url=url_original,
                         payloadPost=payloadPost_original,
@@ -1573,6 +1659,7 @@ class Session:
                         noIndex=noIndex,
                         fullResponse=fullResponse,
                         noQuery=noQuery,
+                        **kwargs,
                     )
                 # --- update developer runtime info ---
                 try:
@@ -1585,14 +1672,15 @@ class Session:
                     pass
 
                 # an action consumes the token and the response carries the next one
-                if "action" in payloadPost or "action" in params:
-                    new_token = re.search(r'actionRequest"?:\s*"(.*?)"', resp)
+                new_token = re.search(r'actionRequest"?:\s*"(.*?)"', resp)
+                if new_token:
                     sessionData = self.getSessionData()
-                    if new_token:
-                        sessionData.pop("shared", None)
-                        sessionData["actionRequestToken"] = new_token.group(1)
-                        self.setSessionData(sessionData)
-                    elif sessionData.pop("actionRequestToken", None) is not None:
+                    sessionData.pop("shared", None)
+                    sessionData["actionRequestToken"] = new_token.group(1)
+                    self.setSessionData(sessionData)
+                elif "action" in payloadPost or "action" in params or "action=" in url:
+                    sessionData = self.getSessionData()
+                    if sessionData.pop("actionRequestToken", None) is not None:
                         sessionData.pop("shared", None)
                         self.setSessionData(sessionData)
 
@@ -1601,9 +1689,13 @@ class Session:
                 self.__sessionExpired()
             except requests.exceptions.ConnectionError:
                 self.logger.warning(f"Connection error occured, retrying in {ConnectionError_wait}s\n{str(params) + ' --> ' + url}")
+                if attempts >= 3:
+                    raise
                 time.sleep(ConnectionError_wait)
             except requests.exceptions.Timeout:
-                self.logger.warning(f"5 minute timeout occured on request, retrying in {ConnectionError_wait}s\n{str(params) + ' --> ' + url}")
+                self.logger.warning(f"Timeout occurred on POST request (tentativa {attempts}/3): {str(params) + ' --> ' + url}")
+                if attempts >= 3:
+                    raise
                 time.sleep(ConnectionError_wait)
 
     def logout(self):

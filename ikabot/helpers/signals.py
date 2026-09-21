@@ -3,6 +3,7 @@
 
 import os
 import signal
+import threading
 
 from ikabot.config import *
 from ikabot.helpers.botComm import *
@@ -12,8 +13,19 @@ def do_nothing(signal, frame):
     pass
 
 
+def is_main_thread():
+    try:
+        return threading.current_thread() is threading.main_thread()
+    except Exception:
+        return True
+
+
 def deactivate_sigint():
-    signal.signal(signal.SIGINT, do_nothing)
+    if is_main_thread():
+        try:
+            signal.signal(signal.SIGINT, do_nothing)
+        except Exception:
+            pass
 
 
 def create_handler(s):
@@ -24,12 +36,16 @@ def create_handler(s):
 
 
 def setSignalsHandlers(s):
-    signals = [
-        signal.SIGINT,
-        signal.SIGTERM,
-    ]  # signal.SIGQUIT replaced with signal.SIGINT for compatibility
-    for sgn in signals:
-        signal.signal(sgn, create_handler(s))
+    if is_main_thread():
+        signals = [
+            signal.SIGINT,
+            signal.SIGTERM,
+        ]  # signal.SIGQUIT replaced with signal.SIGINT for compatibility
+        for sgn in signals:
+            try:
+                signal.signal(sgn, create_handler(s))
+            except Exception:
+                pass
 
 
 def setInfoSignal(session, info):  # send process info to bot
@@ -39,11 +55,15 @@ def setInfoSignal(session, info):  # send process info to bot
     session : ikabot.web.session.Session
     info : str
     """
-    info = "information of the process {}:\n{}".format(os.getpid(), info)
+    if is_main_thread():
+        info = "information of the process {}:\n{}".format(os.getpid(), info)
 
-    def _sendInfo(signum, frame):
-        sendToBot(session, info)
+        def _sendInfo(signum, frame):
+            sendToBot(session, info)
 
-    signal.signal(
-        signal.SIGABRT, _sendInfo
-    )  # kill -SIGUSR1 pid, SIGUSR1 replaced with SIGABRT for compatibility
+        try:
+            signal.signal(
+                signal.SIGABRT, _sendInfo
+            )  # kill -SIGUSR1 pid, SIGUSR1 replaced with SIGABRT for compatibility
+        except Exception:
+            pass
